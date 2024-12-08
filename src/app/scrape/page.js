@@ -11,15 +11,18 @@ function ScrapePage() {
     const [error, setError] = useState(null);
 
     const handleSubmit = async (e) => {
-        e.preventDefault(); // Voorkom pagina-herladen
+        e.preventDefault(); // Voorkom pagina-refresh
         setLoading(true);
         setError(null);
         setResult(null);
 
         try {
-            const response = await fetch(
-                `/api/scrape?url=${encodeURIComponent(url)}&productName=${encodeURIComponent(productName)}&brandName=${encodeURIComponent(brandName)}`
-            );
+            // Bouw de API-query
+            const params = new URLSearchParams({ url, productName });
+            if (brandName) params.append('brandName', brandName);
+
+            // Verstuur het verzoek
+            const response = await fetch(`/api/scrape?${params.toString()}`);
             if (!response.ok) {
                 throw new Error(`Error: ${response.statusText}`);
             }
@@ -33,69 +36,35 @@ function ScrapePage() {
     };
 
     return (
-        <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px' }}>
+        <div>
             <h1>PagePolly Scraper</h1>
             <form onSubmit={handleSubmit}>
-                <div style={{ marginBottom: '10px' }}>
-                    <label>
-                        URL:
-                        <input
-                            type="url"
-                            value={url}
-                            onChange={(e) => setUrl(e.target.value)}
-                            placeholder="https://example.com"
-                            required
-                            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-                        />
-                    </label>
-                </div>
-                <div style={{ marginBottom: '10px' }}>
-                    <label>
-                        Productnaam:
-                        <input
-                            type="text"
-                            value={productName}
-                            onChange={(e) => setProductName(e.target.value)}
-                            placeholder="Bijv. Wandla"
-                            required
-                            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-                        />
-                    </label>
-                </div>
-                <div style={{ marginBottom: '10px' }}>
-                    <label>
-                        Merknaam:
-                        <input
-                            type="text"
-                            value={brandName}
-                            onChange={(e) => setBrandName(e.target.value)}
-                            placeholder="Bijv. Ferrum"
-                            required
-                            style={{ width: '100%', padding: '8px', marginTop: '5px' }}
-                        />
-                    </label>
-                </div>
-                <button
-                    type="submit"
-                    disabled={loading}
-                    style={{ padding: '10px 15px', cursor: 'pointer', backgroundColor: '#0070f3', color: 'white', border: 'none', borderRadius: '5px' }}
-                >
+                <input
+                    type="url"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    placeholder="URL"
+                    required
+                />
+                <input
+                    type="text"
+                    value={productName}
+                    onChange={(e) => setProductName(e.target.value)}
+                    placeholder="Productnaam"
+                    required
+                />
+                <input
+                    type="text"
+                    value={brandName}
+                    onChange={(e) => setBrandName(e.target.value)}
+                    placeholder="Merknaam (optioneel)"
+                />
+                <button type="submit" disabled={loading}>
                     {loading ? 'Scraping...' : 'Start Scraping'}
                 </button>
             </form>
-            {error && (
-                <div style={{ color: 'red', marginTop: '20px' }}>
-                    <strong>Error:</strong> {error}
-                </div>
-            )}
-            {result && (
-                <div style={{ marginTop: '20px', padding: '10px', border: '1px solid #ddd', borderRadius: '5px' }}>
-                    <h3>Resultaten:</h3>
-                    <pre>
-                        <code>{JSON.stringify(result, null, 2)}</code>
-                    </pre>
-                </div>
-            )}
+            {error && <div>Error: {error}</div>}
+            {result && <pre>{JSON.stringify(result, null, 2)}</pre>}
         </div>
     );
 }
