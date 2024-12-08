@@ -1,36 +1,63 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PagePolly
+
+PagePolly is een krachtige webscraper gebouwd met Next.js en Puppeteer. Het stelt je in staat om websites te crawlen en specifieke data te verzamelen, zoals paginatitels.
+
+## Features
+- Gebruiksvriendelijke API voor scraping
+- Gebouwd met Next.js en Puppeteer
+- JSON-uitvoer voor eenvoud in integratie
+- Open-source en uitbreidbaar
 
 ## Getting Started
 
-First, run the development server:
+### Installatie
+1. Clone de repository:
+   ```bash
+   git clone https://github.com/Ollie-nl/PagePolly.git
+   cd PagePolly
+
+
+Installeer de dependencies:
+
+```bash
+npm install
+```
+
+Start de development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+##API Gebruiken
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+###Endpoint
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+GET /api/scrape?url=<website-url>
 
-## Learn More
+Voorbeeld:
+GET http://localhost:3000/api/scrape?url=https://example.com
 
-To learn more about Next.js, take a look at the following resources:
+Respons JSON:
+{
+    "title": "Example Domain"
+}
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Contributing
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Contributies zijn welkom! Maak een fork en stuur een pull request.
 
-## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+---
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### **2. Een open-source licentie toevoegen**
+Een licentie is belangrijk als je wilt dat anderen je project vrij kunnen gebruiken, aanpassen en delen.
+
+#### **De juiste licentie kiezen**
+De **MIT-licentie** is een van de meest gebruikte licenties voor open-source projecten. Het is eenvoudig en geeft anderen vrijheid, zolang ze je credits geven.
+
+#### **Hoe toevoegen?**
+1. Maak een bestand `LICENSE` aan in de root van je project:
+   ```bash
+   touch LICENSE
