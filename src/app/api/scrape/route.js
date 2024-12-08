@@ -1,4 +1,3 @@
-import { createProgressTracker } from '../../../lib/progress';
 import { scrapePage } from '../../../lib/scraper';
 
 export async function GET(request) {
@@ -13,25 +12,34 @@ export async function GET(request) {
         );
     }
 
-    const progress = createProgressTracker();
+    const stream = new ReadableStream({
+        start(controller) {
+            const progress = {
+                add(message) {
+                    const event = `data: ${JSON.stringify({ message })}\n\n`;
+                    controller.enqueue(new TextEncoder().encode(event));
+                },
+            };
 
-    try {
-        const results = await scrapePage(url, productName, brandName, progress);
+            scrapePage(url, productName, brandName, progress)
+                .then((results) => {
+                    const event = `data: ${JSON.stringify({ done: true, results })}\n\n`;
+                    controller.enqueue(new TextEncoder().encode(event));
+                    controller.close();
+                })
+                .catch((error) => {
+                    const event = `data: ${JSON.stringify({ error: error.message })}\n\n`;
+                    controller.enqueue(new TextEncoder().encode(event));
+                    controller.close();
+                });
+        },
+    });
 
-        return new Response(
-            JSON.stringify({
-                progress: progress.get(),
-                results,
-            }),
-            { status: 200 }
-        );
-    } catch (error) {
-        return new Response(
-            JSON.stringify({
-                progress: progress.get(),
-                error: error.message,
-            }),
-            { status: 500 }
-        );
-    }
+    return new Response(stream, {
+        headers: {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            Connection: 'keep-alive',
+        },
+    });
 }

@@ -7,32 +7,51 @@ function ScrapePage() {
     const [url, setUrl] = useState('');
     const [productName, setProductName] = useState('');
     const [brandName, setBrandName] = useState('');
-    const [loading, setLoading] = useState(false);
+    const [progress, setProgress] = useState([]); // Voor voortgangsberichten
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
 
     const handleSubmit = async (e) => {
         e.preventDefault(); // Voorkom pagina-refresh
-        setLoading(true);
-        setError(null);
+        setProgress([]); // Reset voortgang
         setResult(null);
+        setError(null);
 
         try {
-            // Bouw de API-query
-            const params = new URLSearchParams({ url, productName });
+            // Controleer of de URL begint met https:// en voeg dit toe indien nodig
+            let formattedUrl = url.trim();
+            if (!formattedUrl.startsWith('https://')) {
+                formattedUrl = `https://${formattedUrl}`;
+            }
+
+            // Bouw de query parameters
+            const params = new URLSearchParams({ url: formattedUrl, productName });
             if (brandName) params.append('brandName', brandName);
 
-            // Verstuur het verzoek
-            const response = await fetch(`/api/scrape?${params.toString()}`);
-            if (!response.ok) {
-                throw new Error(`Error: ${response.statusText}`);
-            }
-            const data = await response.json();
-            setResult(data);
+            // Open een EventSource-verbinding voor realtime updates
+            const eventSource = new EventSource(`/api/scrape?${params.toString()}`);
+
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+
+                // Beëindig als het proces voltooid is
+                if (data.done) {
+                    setResult(data.results);
+                    eventSource.close();
+                } else if (data.error) {
+                    setError(data.error);
+                    eventSource.close();
+                } else {
+                    setProgress((prev) => [...prev, data.message]); // Voeg voortgang toe
+                }
+            };
+
+            eventSource.onerror = () => {
+                setError('Er is een fout opgetreden tijdens het scrapen.');
+                eventSource.close();
+            };
         } catch (err) {
             setError(err.message);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -78,23 +97,38 @@ function ScrapePage() {
                 </div>
                 <button
                     type="submit"
-                    disabled={loading}
                     className="button"
                 >
-                    {loading ? 'Scraping...' : 'Start Scraping'}
+                    Start Scraping
                 </button>
             </form>
-            {error && (
-                <div className="error">
-                    <strong>Error:</strong> {error}
+
+            {/* Voortgang tonen */}
+            {progress.length > 0 && (
+                <div className="progress">
+                    <h3>Voortgang:</h3>
+                    <ul>
+                        {progress.map((message, index) => (
+                            <li key={index}>{message}</li>
+                        ))}
+                    </ul>
                 </div>
             )}
+
+            {/* Resultaten tonen */}
             {result && (
                 <div className="result">
                     <h3>Resultaten:</h3>
                     <pre>
                         <code>{JSON.stringify(result, null, 2)}</code>
                     </pre>
+                </div>
+            )}
+
+            {/* Foutmelding tonen */}
+            {error && (
+                <div className="error">
+                    <strong>Error:</strong> {error}
                 </div>
             )}
         </div>
