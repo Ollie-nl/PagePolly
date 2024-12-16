@@ -10,6 +10,43 @@ function ScrapePage() {
     const [progress, setProgress] = useState([]); // Voor voortgangsberichten
     const [result, setResult] = useState(null);
     const [error, setError] = useState(null);
+    const [country, setCountry] = useState(null); // Landinformatie
+
+    const handleCheckCountry = async () => {
+        if (!url) {
+            setCountry('Geen URL ingevoerd');
+            return;
+        }
+        setCountry('Landinformatie ophalen...');
+        try {
+            // URL opschonen
+            const formattedUrl = url.trim().replace(/^https?:\/\//, '').split('/')[0];
+    
+            // Stap 1: Domeinnaam omzetten naar IP-adres
+            const dnsResponse = await fetch(`https://dns.google/resolve?name=${formattedUrl}&type=A`);
+            const dnsData = await dnsResponse.json();
+    
+            if (!dnsData || !dnsData.Answer || dnsData.Answer.length === 0) {
+                setCountry('IP-adres niet gevonden');
+                return;
+            }
+    
+            const ipAddress = dnsData.Answer[0].data;
+    
+            // Stap 2: Gebruik Geo.js om landinformatie op te halen
+            const geoResponse = await fetch(`https://get.geojs.io/v1/ip/geo/${ipAddress}.json`);
+            const geoData = await geoResponse.json();
+    
+            if (geoData && geoData.country) {
+                setCountry(geoData.country); // Update landinformatie
+            } else {
+                setCountry('Land niet gevonden');
+            }
+        } catch (err) {
+            console.error('Fout bij ophalen van land:', err);
+            setCountry('Fout bij ophalen van land');
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault(); // Voorkom pagina-refresh
@@ -18,23 +55,19 @@ function ScrapePage() {
         setError(null);
 
         try {
-            // Controleer of de URL begint met https:// en voeg dit toe indien nodig
             let formattedUrl = url.trim();
             if (!formattedUrl.startsWith('https://')) {
                 formattedUrl = `https://${formattedUrl}`;
             }
 
-            // Bouw de query parameters
             const params = new URLSearchParams({ url: formattedUrl, productName });
             if (brandName) params.append('brandName', brandName);
 
-            // Open een EventSource-verbinding voor realtime updates
             const eventSource = new EventSource(`/api/scrape?${params.toString()}`);
 
             eventSource.onmessage = (event) => {
                 const data = JSON.parse(event.data);
 
-                // Beëindig als het proces voltooid is
                 if (data.done) {
                     setResult(data.results);
                     eventSource.close();
@@ -42,7 +75,7 @@ function ScrapePage() {
                     setError(data.error);
                     eventSource.close();
                 } else {
-                    setProgress((prev) => [...prev, data.message]); // Voeg voortgang toe
+                    setProgress((prev) => [...prev, data.message]);
                 }
             };
 
@@ -67,12 +100,23 @@ function ScrapePage() {
                             id="url"
                             type="text"
                             value={url}
-                            onChange={(e) => setUrl(e.target.value)}
+                            onChange={(e) => {
+                                setUrl(e.target.value);
+                                setCountry(null); // Reset landinformatie bij wijziging
+                            }}
                             placeholder="example.com"
                             required
                             className="input"
                         />
                     </div>
+                    <button
+                        type="button"
+                        onClick={handleCheckCountry}
+                        className="button"
+                    >
+                        Check Land
+                    </button>
+                    {country && <p>Land: <strong>{country}</strong></p>}
                 </div>
                 <div className="form-group">
                     <label htmlFor="productName">Productnaam:</label>
@@ -103,7 +147,6 @@ function ScrapePage() {
                 </button>
             </form>
 
-            {/* Voortgang tonen */}
             {progress.length > 0 && (
                 <div className="progress">
                     <h3>Voortgang:</h3>
@@ -115,7 +158,6 @@ function ScrapePage() {
                 </div>
             )}
 
-            {/* Resultaten tonen */}
             {result && (
                 <div className="result">
                     <h3>Resultaten:</h3>
@@ -125,7 +167,6 @@ function ScrapePage() {
                 </div>
             )}
 
-            {/* Foutmelding tonen */}
             {error && (
                 <div className="error">
                     <strong>Error:</strong> {error}
