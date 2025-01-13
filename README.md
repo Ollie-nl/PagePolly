@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PagePolly
+
+PagePolly is a powerful and extensible web crawler built using Puppeteer and Node.js. It allows you to crawl entire websites for text-based content, save the results in a structured database, and customize crawling behavior with advanced features like user agent rotation and pauses.
+
+## Features
+
+- **Customizable Crawling**: Supports different user agents and adjustable delays between requests.
+- **Text-Only Crawling**: Extracts only textual content, including headings, paragraphs, and metadata.
+- **Database Integration**: Stores crawled data in a structured format for future analysis and filtering.
+- **Modern Stack**: Built using Puppeteer, Node.js, and React for frontend dashboard capabilities.
+- **Stealth Mode**: Uses Puppeteer Extra Stealth Plugin to avoid detection.
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
+Make sure you have the following installed:
+- [Node.js](https://nodejs.org/) (v18 or higher recommended)
+- [pnpm](https://pnpm.io/) (preferred package manager)
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/Ollie-nl/PagePolly.git
+   cd PagePolly
+   ```
+
+2. Install dependencies:
+   ```bash
+   pnpm install
+   ```
+
+3. Start the development server:
+   ```bash
+   pnpm dev
+   ```
+
+## Usage
+
+### Running the Crawler
+
+Use the following command to start the crawler with a test URL:
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm run crawler
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+You can edit the crawling logic and the URL in `src/crawlers/testCrawler.js`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Configuration
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Adjust the crawling behavior in `src/crawlers/`:
+- **User Agents**: Configure different user agents for rotation.
+- **Pauses**: Introduce delays between requests to avoid detection.
+- **Text-Only Crawling**: Customize the logic to filter out non-textual content.
 
-## Learn More
+### Saving Data to Database
 
-To learn more about Next.js, take a look at the following resources:
+The crawler is designed to integrate with a database. Configure the database connection in `src/database/config.js` and use the provided utility functions to save crawled data.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Roadmap
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Expand support for multiple crawling strategies (e.g., sitemap-based crawling).
+- Create a React-based dashboard for visualizing and filtering crawled data.
+- Implement advanced error handling and retry mechanisms.
 
-## Deploy on Vercel
+## Contributing
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Contributions are welcome! Please follow these steps:
+1. Fork the repository.
+2. Create a feature branch: `git checkout -b feature-name`
+3. Commit your changes: `git commit -m "Add feature description"`
+4. Push to the branch: `git push origin feature-name`
+5. Create a pull request.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+---
+
+Happy Crawling! 🕷️
