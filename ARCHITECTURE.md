@@ -109,5 +109,26 @@ A React-based frontend will provide a user-friendly interface for:
 4. **Sitemap Parsing**: Efficiently crawl sites using their sitemaps.
 
 ---
+## **Folder structure**
+
+project-root/
+├── public/
+│   └── index.html           # HTML bestand voor de frontend
+├── src/
+│   ├── backend/
+│   │   ├── server.js        # Backend server om API's te hosten
+│   │   └── crawler.js       # Crawler-logica
+│   ├── components/
+│   │   ├── CrawlForm.jsx    # React component voor invoer
+│   │   └── ResultsList.jsx  # React component om resultaten te tonen
+│   ├── App.jsx              # Hoofdcomponent van React
+│   ├── index.js             # Instappunt van de React-app
+├── package.json             # Dependencies en scripts
+├── webpack.config.js        # Webpack configuratie
+└── README.md                # Documentatie
+
+
+
+---
 
 For questions or suggestions, please feel free to contribute or create an issue in the repository!
