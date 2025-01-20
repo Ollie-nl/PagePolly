@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  database:
+    image: postgres:15
+    container_name: pagepolly_db
+    restart: always
+    environment:
+      POSTGRES_USER: admin_user
+      POSTGRES_PASSWORD: t3st-!!-L@ng
+      POSTGRES_DB: pagepolly_db
+    ports:
+      - "5432:5432"
+    networks:
+      - pagepolly_network
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin_user -d pagepolly_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pagepolly_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: webzucht@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: MYdatabase!!!!
+    ports:
+      - "8080:80"
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - pagepolly_network
+
+networks:
+  pagepolly_network:
+
+volumes:
+  db_data:

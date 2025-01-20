@@ -1,134 +1,228 @@
-# PagePolly Architecture
 
-This document provides an overview of the architecture for the PagePolly project. The system is designed to be modular, scalable, and easy to extend.
+# PagePolly Architecture EN
 
----
-
-## **Overview**
-
-PagePolly is a web crawler and data extractor built with Puppeteer for web scraping and Node.js for backend functionality. The system integrates a database for storing extracted content and is designed to support a React-based dashboard for visualizing and managing crawled data.
+This document provides an overview of the updated system architecture for PagePolly. The system is designed to be modular, scalable, and easy to extend.
 
 ---
 
-## **System Components**
+## System Components
 
-### **1. Puppeteer Crawler**
-The core of the project is the Puppeteer-based crawler, which:
+### 1. **Puppeteer Crawler**
 - Navigates websites stealthily using the Puppeteer Extra Stealth Plugin.
-- Extracts textual content (e.g., headings, paragraphs, and metadata).
+- Extracts text-only content (e.g., headings, paragraphs, and metadata).
 - Rotates user agents to mimic different browsers.
 - Introduces delays between requests to avoid detection.
 
-**Files:**
-- `src/crawlers/`
-- `src/crawlers/testCrawler.js`
+---
+
+### 2. **Node.js Backend**
+- Exposes APIs for managing crawling workflows.
+- Integrates PostgreSQL for storing extracted data.
 
 ---
 
-### **2. Node.js Backend**
-The backend manages the crawling workflow and integrates with the database. Key features:
-- Exposes APIs for managing crawl requests.
-- Handles error logging and retries.
-- Configures the database connection for storing extracted data.
+### 3. **PostgreSQL Database**
+Schema:
+```sql
+CREATE TABLE sites (
+    id SERIAL PRIMARY KEY,
+    url TEXT NOT NULL UNIQUE,
+    name TEXT,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
-**Files:**
-- `src/server/`
-- `src/database/`
-
----
-
-### **3. Database Layer**
-The database stores the structured data extracted during crawling. Schema includes:
-- **Crawled URLs:**
-  - URL
-  - Title
-  - Metadata
-  - Content
-  - Crawl date
-- **Error Logs:**
-  - URL
-  - Error type
-  - Timestamp
-
-**Supported Databases:**
-- MongoDB (default)
-- PostgreSQL (future integration)
-
-**Files:**
-- `src/database/config.js`
-- `src/database/models/`
+CREATE TABLE crawled_pages (
+    id SERIAL PRIMARY KEY,
+    site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    title TEXT,
+    content TEXT,
+    date_crawled TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status_code INTEGER,
+    depth INTEGER,
+    response_time INTEGER,
+    headings TEXT,
+    links TEXT[],
+    user_agent TEXT,
+    crawler_version TEXT,
+    source TEXT,
+    language TEXT,
+    is_valid BOOLEAN DEFAULT TRUE
+);
+```
 
 ---
 
-### **4. React Dashboard (Planned)**
-A React-based frontend will provide a user-friendly interface for:
-- Visualizing and filtering crawled data.
-- Monitoring crawl progress.
-- Configuring crawler settings.
-
-**Planned Features:**
-- Search and filter functionality.
-- Graphical representation of crawling statistics.
-
-**Files:**
-- `src/frontend/`
+### 4. **React Dashboard**
+- Provides a frontend for visualizing and analyzing crawled data.
+- Includes features for filtering, searching, and monitoring.
 
 ---
 
-## **Workflow**
+## Workflow
 
 1. **Initiate Crawl**:
-   - A user specifies a target URL via CLI or API.
-2. **Crawl Process**:
-   - Puppeteer navigates the site, extracts content, and stores it in the database.
-   - User agents and delays are applied to avoid detection.
+   - User specifies a target URL, depth, and optional metadata via the frontend.
+2. **Data Extraction**:
+   - Puppeteer extracts text content, metadata, and site structure.
 3. **Data Storage**:
-   - Extracted text and metadata are saved in the database for later use.
-4. **Data Visualization**:
-   - (Planned) Data is displayed in a React dashboard for analysis.
+   - Extracted data is stored in PostgreSQL for structured analysis.
+4. **Visualization**:
+   - Data is displayed in a React-based dashboard.
 
 ---
 
-## **Technology Stack**
+## Technology Stack
 
-| Layer                | Technology                |
-|----------------------|---------------------------|
-| Web Crawling         | Puppeteer, Puppeteer Extra Plugins |
-| Backend              | Node.js                  |
-| Database             | PostgreSQL (future) |
-| Frontend (Planned)   | React, Next.js    |
-| Package Manager      | pnpm                     |
-
----
-
-## **Planned Extensions**
-
-1. **Proxies**: Add proxy support for advanced crawling.
-2. **Advanced Error Handling**: Retry logic for failed requests.
-3. **Distributed Crawling**: Scale the crawler across multiple nodes.
-4. **Sitemap Parsing**: Efficiently crawl sites using their sitemaps.
+| Layer          | Technology         |
+|----------------|--------------------|
+| Web Crawling   | Puppeteer          |
+| Backend        | Node.js            |
+| Database       | PostgreSQL         |
+| Frontend       | React              |
+| Containerization | Docker           |
 
 ---
-## **Folder structure**
 
+## Folder Structure
+
+```
 project-root/
 ├── public/
-│   └── index.html           # HTML bestand voor de frontend
+│   └── index.html
 ├── src/
 │   ├── backend/
-│   │   ├── server.js        # Backend server om API's te hosten
-│   │   └── crawler.js       # Crawler-logica
+│   │   ├── server.js
+│   │   ├── crawler.js
+│   │   ├── userAgents.js
+│   │   └── db.js
 │   ├── components/
-│   │   ├── CrawlForm.jsx    # React component voor invoer
-│   │   └── ResultsList.jsx  # React component om resultaten te tonen
-│   ├── App.jsx              # Hoofdcomponent van React
-│   ├── index.js             # Instappunt van de React-app
-├── package.json             # Dependencies en scripts
-├── webpack.config.js        # Webpack configuratie
-└── README.md                # Documentatie
-
-
+│   │   ├── CrawlForm.jsx
+│   │   └── ResultsList.jsx
+│   ├── App.jsx
+│   ├── index.js
+├── docker-compose.yml
+├── .env
+├── package.json
+├── README.md
+└── ARCHITECTURE.md
+```
 
 ---
 
-For questions or suggestions, please feel free to contribute or create an issue in the repository!
+For questions or suggestions, feel free to contribute or create an issue!
+
+
+# PagePolly Architectuur NL
+
+Dit document geeft een overzicht van de bijgewerkte systeemarchitectuur van PagePolly. Het systeem is ontworpen om modulair, schaalbaar en eenvoudig uitbreidbaar te zijn.
+
+---
+
+## Systeemonderdelen
+
+### 1. **Puppeteer Crawler**
+- Navigeert stealthily door websites met behulp van de Puppeteer Extra Stealth Plugin.
+- Extraheert alleen tekstuele inhoud (bijvoorbeeld headings, paragrafen en metadata).
+- Roteert user agents om verschillende browsers na te bootsen.
+- Voegt vertragingen toe tussen verzoeken om detectie te voorkomen.
+
+---
+
+### 2. **Node.js Backend**
+- Biedt API's aan voor het beheren van crawling-workflows.
+- Integreert PostgreSQL voor het opslaan van geëxtraheerde gegevens.
+
+---
+
+### 3. **PostgreSQL Database**
+Schema:
+```sql
+CREATE TABLE sites (
+    id SERIAL PRIMARY KEY,
+    url TEXT NOT NULL UNIQUE,
+    name TEXT,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE crawled_pages (
+    id SERIAL PRIMARY KEY,
+    site_id INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    url TEXT NOT NULL,
+    title TEXT,
+    content TEXT,
+    date_crawled TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status_code INTEGER,
+    depth INTEGER,
+    response_time INTEGER,
+    headings TEXT,
+    links TEXT[],
+    user_agent TEXT,
+    crawler_version TEXT,
+    source TEXT,
+    language TEXT,
+    is_valid BOOLEAN DEFAULT TRUE
+);
+```
+
+---
+
+### 4. **React Dashboard**
+- Biedt een frontend voor het visualiseren en analyseren van gecrawlde gegevens.
+- Bevat functies voor filteren, zoeken en monitoren.
+
+---
+
+## Workflow
+
+1. **Start Crawling**:
+   - Gebruikers geven een URL, diepte en optionele metadata op via de frontend.
+2. **Data Extractie**:
+   - Puppeteer extraheert tekstinhoud, metadata en site-structuur.
+3. **Gegevensopslag**:
+   - Geëxtraheerde gegevens worden opgeslagen in PostgreSQL voor gestructureerde analyse.
+4. **Visualisatie**:
+   - Gegevens worden weergegeven in een React-gebaseerd dashboard.
+
+---
+
+## Technologie Stack
+
+| Laag             | Technologie       |
+|------------------|-------------------|
+| Web Crawling     | Puppeteer         |
+| Backend          | Node.js           |
+| Database         | PostgreSQL        |
+| Frontend         | React             |
+| Containerisatie  | Docker            |
+
+---
+
+## Mapstructuur
+
+```
+project-root/
+├── public/
+│   └── index.html
+├── src/
+│   ├── backend/
+│   │   ├── server.js
+│   │   ├── crawler.js
+│   │   └── db.js
+│   ├── components/
+│   │   ├── CrawlForm.jsx
+│   │   └── ResultsList.jsx
+│   ├── App.jsx
+│   ├── index.js
+├── docker-compose.yml
+├── .env
+├── package.json
+├── README.md
+└── ARCHITECTURE.md
+```
+
+---
+
+Voor vragen of suggesties kun je bijdragen of een issue aanmaken!

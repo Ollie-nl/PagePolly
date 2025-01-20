@@ -12,9 +12,12 @@
     "server": "nodemon src/backend/server.js"
   },
   "dependencies": {
+    "body-parser": "^1.20.3",
     "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
     "express": "^4.21.2",
-    "next": "^15.1.4",
+    "next": "^15.1.5",
+    "pg": "^8.13.1",
     "puppeteer": "^24.0.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
@@ -46,5 +49,6 @@
     "webpack": "^5.97.1",
     "webpack-cli": "^6.0.1",
     "webpack-dev-server": "^5.2.0"
-  }
+  },
+  "proxy": "http://localhost:5003"
 }

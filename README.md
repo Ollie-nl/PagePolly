@@ -1,22 +1,29 @@
-# PagePolly
 
-PagePolly is a powerful and extensible web crawler built using Puppeteer and Node.js. It allows you to crawl entire websites for text-based content, save the results in a structured database, and customize crawling behavior with advanced features like user agent rotation and pauses.
+# PagePolly EN
+
+PagePolly is a powerful and extensible web crawler built using Puppeteer, Node.js, and PostgreSQL. It enables you to crawl websites for text-based content, save results in a structured database, and visualize data with a React-based dashboard.
+
+---
 
 ## Features
 
-- **Customizable Crawling**: Supports different user agents and adjustable delays between requests.
-- **Text-Only Crawling**: Extracts only textual content, including headings, paragraphs, and metadata.
-- **Database Integration**: Stores crawled data in a structured format for future analysis and filtering.
-- **Modern Stack**: Built using Puppeteer, Node.js, and React for frontend dashboard capabilities.
-- **Stealth Mode**: Uses Puppeteer Extra Stealth Plugin to avoid detection.
+- **Customizable Crawling**: User-agent rotation, delays, and stealth mode.
+- **Text-Only Crawling**: Extracts headings, paragraphs, and metadata.
+- **Database Integration**: Uses PostgreSQL for structured storage.
+- **Modern Stack**: Puppeteer, Node.js, React.
+- **Stealth Mode**: Avoids detection using Puppeteer Extra Stealth Plugin.
+
+---
 
 ## Getting Started
 
 ### Prerequisites
 
-Make sure you have the following installed:
-- [Node.js](https://nodejs.org/) (v18 or higher recommended)
-- [pnpm](https://pnpm.io/) (preferred package manager)
+- [Node.js](https://nodejs.org/) (v18+)
+- [pnpm](https://pnpm.io/)
+- [Docker](https://www.docker.com/)
+
+---
 
 ### Installation
 
@@ -31,52 +38,165 @@ Make sure you have the following installed:
    pnpm install
    ```
 
-3. Start the development server:
+3. Start the backend server with Docker:
    ```bash
-   pnpm dev
+   docker-compose up -d
    ```
+
+4. Run the development server:
+   ```bash
+   pnpm start
+   ```
+
+---
 
 ## Usage
 
 ### Running the Crawler
 
-Use the following command to start the crawler with a test URL:
-```bash
-pnpm run crawler
-```
+- To start crawling:
+  ```bash
+  pnpm run server
+  ```
+- Enter the target URL and depth in the frontend form.
 
-You can edit the crawling logic and the URL in `src/crawlers/testCrawler.js`.
-
-### Configuration
-
-Adjust the crawling behavior in `src/crawlers/`:
-- **User Agents**: Configure different user agents for rotation.
-- **Pauses**: Introduce delays between requests to avoid detection.
-- **Text-Only Crawling**: Customize the logic to filter out non-textual content.
-
-### Saving Data to Database
-
-The crawler is designed to integrate with a database. Configure the database connection in `src/database/config.js` and use the provided utility functions to save crawled data.
+---
 
 ## Roadmap
 
-- Expand support for multiple crawling strategies (e.g., sitemap-based crawling).
-- Create a React-based dashboard for visualizing and filtering crawled data.
-- Implement advanced error handling and retry mechanisms.
+- Expand crawling strategies.
+- Add proxy support.
+- React dashboard for visualization.
+- Distributed crawling.
+
+---
 
 ## Contributing
 
-Contributions are welcome! Please follow these steps:
+Contributions are welcome!
+
 1. Fork the repository.
-2. Create a feature branch: `git checkout -b feature-name`
-3. Commit your changes: `git commit -m "Add feature description"`
-4. Push to the branch: `git push origin feature-name`
-5. Create a pull request.
+2. Create a branch:
+   ```bash
+   git checkout -b feature-name
+   ```
+3. Commit your changes:
+   ```bash
+   git commit -m "Add feature description"
+   ```
+4. Push to the branch:
+   ```bash
+   git push origin feature-name
+   ```
+
+---
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License.
 
 ---
 
 Happy Crawling! 🕷️
+
+
+
+# PagePolly NL
+
+PagePolly is een krachtige en uitbreidbare webcrawler gebouwd met Puppeteer, Node.js en PostgreSQL. Het stelt je in staat om websites te crawlen naar tekstuele inhoud, resultaten op te slaan in een gestructureerde database, en data te visualiseren via een React-dashboard.
+
+---
+
+## Functionaliteiten
+
+- **Aanpasbare Crawling**: User-agentrotatie, vertragingen, en stealth-modus.
+- **Alleen Tekst Crawlen**: Headings, paragrafen en metadata.
+- **Database-integratie**: Gebruik van PostgreSQL voor gestructureerde opslag.
+- **Moderne Technologieën**: Puppeteer, Node.js, React.
+- **Stealth-modus**: Verminder detectie met Puppeteer Extra Stealth Plugin.
+
+---
+
+## Aan de Slag
+
+### Vereisten
+
+- [Node.js](https://nodejs.org/) (v18+)
+- [pnpm](https://pnpm.io/)
+- [Docker](https://www.docker.com/)
+
+---
+
+### Installatie
+
+1. Clone de repository:
+   ```bash
+   git clone https://github.com/Ollie-nl/PagePolly.git
+   cd PagePolly
+   ```
+
+2. Installeer afhankelijkheden:
+   ```bash
+   pnpm install
+   ```
+
+3. Start de backendserver met Docker:
+   ```bash
+   docker-compose up -d
+   ```
+
+4. Start de ontwikkelserver:
+   ```bash
+   pnpm start
+   ```
+
+---
+
+## Gebruik
+
+### De Crawler Starten
+
+- Start de crawler:
+  ```bash
+  pnpm run server
+  ```
+- Vul de doel-URL en diepte in via het frontendformulier.
+
+---
+
+## Roadmap
+
+- Crawling-strategieën uitbreiden.
+- Proxy-ondersteuning toevoegen.
+- React-dashboard voor visualisatie.
+- Gedistribueerd crawlen.
+
+---
+
+## Bijdragen
+
+Bijdragen zijn welkom!
+
+1. Fork de repository.
+2. Maak een branch:
+   ```bash
+   git checkout -b feature-name
+   ```
+3. Commit je wijzigingen:
+   ```bash
+   git commit -m "Beschrijving van de wijziging"
+   ```
+4. Push naar de branch:
+   ```bash
+   git push origin feature-name
+   ```
+
+---
+
+## Licentie
+
+Dit project valt onder de MIT-licentie.
+
+---
+
+Veel Crawl-plezier! 🕷️

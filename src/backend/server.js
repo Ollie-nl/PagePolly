@@ -1,37 +1,60 @@
-const express = require('express');
+const express = require('express'); // Import Express
+const app = express(); // Initialiseer de Express-app
+const PORT = 5003;
+const bodyParser = require('body-parser');
+const { startCrawl } = require('./crawler');
 const cors = require('cors');
-const { startCrawler } = require('./crawler');
+const fs = require('fs'); // Voor bestandsopslag
 
-const app = express();
-const port = 5003;
+// Middleware
+app.use(cors());
+app.use(bodyParser.json());
 
-// Configureer CORS met specifieke regels
-const corsOptions = {
-  origin: 'http://localhost:3000', // Sta alleen verzoeken van de frontend toe
-  methods: ['GET', 'POST'], // Toegestane methoden
-  allowedHeaders: ['Content-Type'], // Toegestane headers
+// Variabele om de voortgang bij te houden
+let crawlProgress = null;
+
+// Helperfunctie om gegevens in een bestand op te slaan
+const saveToFile = (data, filename = 'crawled_data.json') => {
+  fs.writeFileSync(filename, JSON.stringify(data, null, 2), 'utf-8');
 };
 
-app.use(cors(corsOptions));
-app.use(express.json());
-
-// Start een crawl
+// Routes
 app.post('/api/crawl', async (req, res) => {
-  const { url, depth } = req.body;
+  const { url, depth = 1, maxPages = 1000 } = req.body;
 
-  if (!url || !depth) {
-    return res.status(400).json({ error: 'URL and depth are required.' });
-  }
+  // Initialiseer voortgang
+  crawlProgress = {
+    totalPages: maxPages,
+    crawledPages: 0,
+    currentUrl: null,
+  };
 
   try {
-    const results = await startCrawler(url, depth);
-    res.json(results);
-  } catch (err) {
-    res.status(500).json({ error: 'Failed to crawl the site.' });
+    console.log(`Crawling URL: ${url} with depth: ${depth} and maxPages: ${maxPages}`);
+
+    // Start de crawl en gebruik een callback om de voortgang bij te werken
+    const crawledPages = await startCrawl(url, maxPages, (progress) => {
+      crawlProgress = { ...crawlProgress, ...progress }; // Update voortgang
+    });
+
+    if (!Array.isArray(crawledPages)) {
+      throw new Error('Invalid data format. Expected an array.');
+    }
+
+    // Opslaan in bestand
+    saveToFile(crawledPages);
+
+    res.json(crawledPages);
+  } catch (error) {
+    console.error('Error during crawl:', error.message);
+    res.status(500).json({ error: `Failed to crawl the site: ${error.message}` });
   }
 });
 
-// Start de server
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+// Endpoint voor voortgang
+app.get('/api/progress', (req, res) => {
+  res.json(crawlProgress || { totalPages: 0, crawledPages: 0, currentUrl: null });
 });
+
+// Start server
+app.listen(PORT, () => console.log(`Backend listening on port ${PORT}`));
