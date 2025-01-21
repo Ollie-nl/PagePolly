@@ -1,10 +1,13 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 
 function ResultsList({ results = [] }) {
-  const [progress, setProgress] = useState({ totalPages: 0, crawledPages: 0, currentUrl: null });
+  const [progress, setProgress] = useState({ totalPages: 0, crawledPages: 0, currentUrl: null, completed: false });
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const interval = setInterval(() => {
+    const fetchProgress = () => {
       fetch('http://localhost:5003/api/progress')
         .then((res) => {
           if (!res.ok) {
@@ -13,50 +16,53 @@ function ResultsList({ results = [] }) {
           return res.json();
         })
         .then((data) => {
-          console.log('Progress data:', data); // Log voortgangsdata
+          console.log('Progress data:', data);
           setProgress(data);
-        })
-        .catch((err) => console.error('Error fetching progress:', err));
-    }, 1000);
 
-    return () => clearInterval(interval); // Stop polling wanneer de component wordt verwijderd
+          // Stop polling als de crawl voltooid is
+          if (data.completed) {
+            clearInterval(interval);
+            console.log('Crawling completed, stopped polling.');
+          }
+
+        })
+        .catch((err) => {
+          console.error('Error fetching progress:', err.message);
+          setError('Failed to fetch progress. Please try again.');
+          clearInterval(interval); // Stop polling bij fout
+        });
+    };
+
+    const interval = setInterval(fetchProgress, 1000);
+
+    return () => clearInterval(interval); // Stop het interval bij demontage
   }, []);
 
-  if (!Array.isArray(results)) {
-    return <p>No results to display yet. Start a crawl to see data.</p>;
+  if (error) {
+    return <p>Error: {error}</p>;
   }
 
   return (
     <div>
       <h2>Crawl Progress</h2>
+      {/* Toon realtime voortgang */}
       <p>
         Crawled {progress.crawledPages || 0} of {progress.totalPages || 0} pages.
       </p>
       <p>Current URL: {progress.currentUrl || 'N/A'}</p>
 
-      <h2>Crawl Results</h2>
-      <ul>
-        {results.map((result, index) => (
-          <li key={index}>
-            <h3>{result.title || 'No Title'}</h3>
-            <p><strong>URL:</strong> {result.url || 'No URL'}</p>
-            <p><strong>Meta Description:</strong> {result.meta?.description || 'No Description'}</p>
-            <p><strong>Meta Keywords:</strong> {result.meta?.keywords || 'No Keywords'}</p>
-            <h4>Headings:</h4>
-            <ul>
-              {result.headings?.map((heading, i) => (
-                <li key={i}>{heading}</li>
-              )) || <li>No Headings</li>}
-            </ul>
-            <h4>Paragraphs:</h4>
-            <ul>
-              {result.paragraphs?.map((paragraph, i) => (
-                <li key={i}>{paragraph}</li>
-              )) || <li>No Paragraphs</li>}
-            </ul>
-          </li>
-        ))}
-      </ul>
+      {/* Visuele voortgangsbalk */}
+      <div style={{ width: '100%', backgroundColor: '#e0e0e0', borderRadius: '5px', marginTop: '10px' }}>
+        <div
+          style={{
+            width: `${(progress.crawledPages / progress.totalPages) * 100 || 0}%`,
+            backgroundColor: '#4caf50',
+            height: '20px',
+            borderRadius: '5px',
+            transition: 'width 0.5s ease',
+          }}
+        ></div>
+      </div>
     </div>
   );
 }

@@ -1,16 +1,18 @@
+'use client'; // Voeg deze directive toe
+
 import React, { useState } from 'react';
 
 function CrawlForm({ onCrawl }) {
   const [url, setUrl] = useState('https://ferrum.audio');
   const [depth, setDepth] = useState(1);
-  const [maxPages, setMaxPages] = useState(1000); // Nieuw state voor maxPages
+  const [maxPages, setMaxPages] = useState(1000);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await onCrawl({ url, depth, maxPages }); // Voeg maxPages toe aan het verzoek
+      await onCrawl({ url, depth, maxPages });
     } finally {
       setLoading(false);
     }

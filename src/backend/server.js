@@ -1,24 +1,22 @@
-const express = require('express'); // Import Express
-const app = express(); // Initialiseer de Express-app
-const PORT = 5003;
+const express = require('express');
+const app = express();
 const bodyParser = require('body-parser');
-const { startCrawl } = require('./crawler');
 const cors = require('cors');
-const fs = require('fs'); // Voor bestandsopslag
+const fs = require('fs');
+const { startCrawl } = require('./crawler');
 
-// Middleware
-app.use(cors());
-app.use(bodyParser.json());
+const PORT = 5003;
 
-// Variabele om de voortgang bij te houden
 let crawlProgress = null;
 
-// Helperfunctie om gegevens in een bestand op te slaan
+// Helperfunctie om data op te slaan in een bestand
 const saveToFile = (data, filename = 'crawled_data.json') => {
   fs.writeFileSync(filename, JSON.stringify(data, null, 2), 'utf-8');
 };
 
-// Routes
+app.use(cors());
+app.use(bodyParser.json());
+
 app.post('/api/crawl', async (req, res) => {
   const { url, depth = 1, maxPages = 1000 } = req.body;
 
@@ -27,14 +25,25 @@ app.post('/api/crawl', async (req, res) => {
     totalPages: maxPages,
     crawledPages: 0,
     currentUrl: null,
+    completed: false, // Voeg een 'completed'-status toe
   };
 
   try {
     console.log(`Crawling URL: ${url} with depth: ${depth} and maxPages: ${maxPages}`);
 
     // Start de crawl en gebruik een callback om de voortgang bij te werken
-    const crawledPages = await startCrawl(url, maxPages, (progress) => {
-      crawlProgress = { ...crawlProgress, ...progress }; // Update voortgang
+    const crawledPages = await startCrawl(url, maxPages, depth, (progress) => {
+      crawlProgress = { ...crawlProgress, ...progress };
+
+      // Update logs voor debugging
+      console.log('Updated crawl progress:', crawlProgress);
+
+      // Controleer of het crawlen voltooid is
+      if (crawlProgress.crawledPages >= crawlProgress.totalPages) {
+        crawlProgress.completed = true; // Markeer als voltooid
+        console.log('Crawl completed.');
+        console.log('Updated crawl progress:', crawlProgress);
+      }
     });
 
     if (!Array.isArray(crawledPages)) {
@@ -44,17 +53,16 @@ app.post('/api/crawl', async (req, res) => {
     // Opslaan in bestand
     saveToFile(crawledPages);
 
-    res.json(crawledPages);
+    res.json({ message: 'Crawl started successfully', crawledPages });
   } catch (error) {
     console.error('Error during crawl:', error.message);
     res.status(500).json({ error: `Failed to crawl the site: ${error.message}` });
   }
 });
 
-// Endpoint voor voortgang
 app.get('/api/progress', (req, res) => {
-  res.json(crawlProgress || { totalPages: 0, crawledPages: 0, currentUrl: null });
+  console.log('Progress data sent:', crawlProgress); // Log progress data
+  res.json(crawlProgress || { totalPages: 0, crawledPages: 0, currentUrl: null, completed: false });
 });
 
-// Start server
 app.listen(PORT, () => console.log(`Backend listening on port ${PORT}`));
