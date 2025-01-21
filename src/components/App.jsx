@@ -1,8 +1,8 @@
 'use client'; // Zorgt ervoor dat React hooks zoals useState werken
-
 import React, { useState } from 'react';
 import CrawlForm from './CrawlForm';
 import ResultsList from './ResultsList';
+import './styles.css';
 
 function App() {
   const [results, setResults] = useState([]); // Voor de crawlresultaten
@@ -39,11 +39,32 @@ function App() {
 
   return (
     <div>
-      <h1>Stealth Crawler</h1>
-      <CrawlForm onCrawl={handleCrawl} />
-      {loading && <p>Loading...</p>} {/* Laadindicator */}
-      {error && <p style={{ color: 'red' }}>Error: {error}</p>} {/* Toon foutmelding */}
-      <ResultsList results={results} />
+      <header>
+        <h1>PagePolly</h1>
+        <p>Efficiënt en discreet websites crawlen.</p>
+      </header>
+
+      <main>
+        <CrawlForm onCrawl={handleCrawl} />
+        
+        {loading && (
+          <div className="loading-container">
+            <p className="loading-text">Loading... Crawling in progress</p>
+          </div>
+        )}
+        
+        {error && (
+          <div className="error-container">
+            <p className="error-text">{error}</p>
+          </div>
+        )}
+
+        <ResultsList results={results} />
+      </main>
+
+      <footer>
+        <p>&copy; 2025 Stealth Crawler | Powered by Puppeteer</p>
+      </footer>
     </div>
   );
 }

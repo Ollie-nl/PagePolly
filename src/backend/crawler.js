@@ -11,6 +11,11 @@ const saveToFileIncrementally = (data, filename = 'crawled_data.json') => {
   fs.writeFileSync(filename, JSON.stringify(updatedData, null, 2), 'utf-8');
 };
 
+// Helper voor dynamische vertragingen
+const randomDelay = (min = 500, max = 2000) => {
+  return new Promise((resolve) => setTimeout(resolve, Math.random() * (max - min) + min));
+};
+
 const startCrawl = async (startUrl, maxPages = 1000, depth = 1, progressCallback = () => {}) => {
   console.log(`Starting crawl for: ${startUrl} | Max Pages: ${maxPages} | Depth: ${depth}`);
   const visitedUrls = new Set();
@@ -27,18 +32,13 @@ const startCrawl = async (startUrl, maxPages = 1000, depth = 1, progressCallback
       const currentTask = toVisitQueue.shift();
       if (!currentTask || !currentTask.url) {
         console.error("Invalid task in queue:", currentTask);
-        continue; // Sla over als er iets mis is met de taak
+        continue;
       }
 
       const { url, currentDepth } = currentTask;
 
       // Update progress voor de huidige URL
       progressCallback({
-        totalPages: maxPages,
-        crawledPages: visitedUrls.size,
-        currentUrl: url,
-      });
-      console.log('Progress callback:', {
         totalPages: maxPages,
         crawledPages: visitedUrls.size,
         currentUrl: url,
@@ -50,8 +50,22 @@ const startCrawl = async (startUrl, maxPages = 1000, depth = 1, progressCallback
       console.log(`Crawling URL: ${url} at depth: ${currentDepth}`);
 
       const page = await browser.newPage();
+
+      // Resourcebeperkingen instellen
+      await page.setRequestInterception(true);
+      page.on('request', (request) => {
+        if (['image', 'media', 'stylesheet', 'font'].includes(request.resourceType())) {
+          request.abort(); // Blokkeer afbeeldingen, media, etc.
+        } else {
+          request.continue();
+        }
+      });
+
       try {
         await page.goto(url, { waitUntil: 'domcontentloaded' });
+
+        // Dynamische vertraging na pagina laden
+        await randomDelay(1000, 3000);
 
         const pageData = await page.evaluate(() => {
           const getTextContent = (selector) =>
@@ -100,7 +114,7 @@ const startCrawl = async (startUrl, maxPages = 1000, depth = 1, progressCallback
     }
   } catch (error) {
     console.error('Crawling error:', error.message);
-    throw error; // Gooi de fout door naar de backend
+    throw error;
   } finally {
     await browser.close();
   }

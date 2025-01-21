@@ -1,0 +1,190 @@
+/* Algemene reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: #0b0c0c;
+  background-color: #f3f2f1;
+  margin: 0;
+  padding: 20px;
+}
+
+/* Header styling */
+header {
+  background-color: #1d70b8;
+  color: #ffffff;
+  padding: 20px;
+  text-align: center;
+}
+
+header h1 {
+  font-size: 2rem;
+  margin-bottom: 10px;
+}
+
+header p {
+  font-size: 1rem;
+}
+
+/* Formulier styling */
+form {
+  background: #ffffff;
+  border: 1px solid #b1b4b6; /* Donkerdere grijze rand */
+  border-radius: 5px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+form label {
+  display: block; /* Zorgt ervoor dat het label op een aparte regel staat */
+  margin-bottom: 5px; /* Kleine ruimte onder het label */
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+
+form input[type="text"],
+form input[type="number"] {
+  display: block; /* Zorgt ervoor dat de invoervelden op een aparte regel staan */
+  margin-bottom: 20px;
+  padding: 10px;
+  border: 1px solid #6f777b; /* Donkerdere grijze rand */
+  border-radius: 4px;
+  background-color: #ffffff;
+  color: #000;
+}
+
+form input[type="text"] {
+  width: 100%; /* Volledige breedte voor tekstinvoer */
+  font-size: 1rem;
+
+}
+
+form input[type="number"] {
+  width: 30%; /* Kleiner formaat voor cijfervelden */
+  font-size: 0.8rem;
+  padding: 8px;
+}
+
+form input[type="text"] {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 20px;
+  border: 1px solid #6f777b; /* Donkerdere grijze rand */
+  border-radius: 4px;
+  font-size: 1rem;
+  background-color: #ffffff;
+}
+
+form input[type="number"] {
+  width: 10%; /* Kleiner formaat voor cijfervelden */
+  padding: 8px;
+  margin-bottom: 20px;
+  border: 1px solid #6f777b; /* Donkerdere grijze rand */
+  border-radius: 4px;
+  font-size: 0.8rem; /* Kleinere tekst */
+  background-color: #ffffff;
+}
+
+form button {
+  background-color: #1d70b8;
+  color: #ffffff;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+form button:disabled {
+  background-color: #b1b4b6;
+  cursor: not-allowed;
+}
+
+form button:hover:not(:disabled) {
+  background-color: #094b79;
+}
+
+/* Error and loading states */
+.loading-container {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.loading-text {
+  font-size: 1.2rem;
+  color: #1d70b8;
+  font-weight: bold;
+}
+
+.error-container {
+  text-align: center;
+  margin-top: 20px;
+  padding: 10px;
+  border: 1px solid red;
+  background-color: #ffe4e4;
+  color: red;
+  border-radius: 5px;
+}
+
+/* Progress bar */
+.progress-bar {
+  background-color: #b1b4b6; /* Grijze achtergrond */
+  border-radius: 5px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.progress-bar div {
+  height: 20px;
+  background-color: #1d70b8; /* Blauw zoals GOV.UK */
+  transition: width 0.3s ease-in-out;
+}
+
+/* Result styling */
+h2 {
+  font-size: 1.5rem;
+  margin-bottom: 10px;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+}
+
+ul li {
+  background: #ffffff;
+  border: 1px solid #d6d5d4;
+  border-radius: 5px;
+  padding: 10px;
+  margin-bottom: 10px;
+}
+
+ul li h3 {
+  margin-bottom: 5px;
+}
+
+ul li p {
+  margin-bottom: 5px;
+  font-size: 0.9rem;
+}
+
+ul li ul {
+  margin-top: 10px;
+  padding-left: 20px;
+}
+
+footer {
+  margin-top: 20px;
+  padding: 10px;
+  background-color: #f3f2f1;
+  text-align: center;
+  color: #6f777b;
+  font-size: 0.9rem;
+}
