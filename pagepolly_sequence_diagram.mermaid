@@ -1,0 +1,61 @@
+sequenceDiagram
+    participant UI as Frontend
+    participant API as API Gateway
+    participant CS as CrawlerService
+    participant SB as ScrapingBeeAdapter
+    participant Q as QueueManager
+    participant DP as DataProcessor
+    participant DB as PostgreSQL
+
+    %% Initialize Crawl Job
+    UI->>API: POST /api/v1/crawl/:siteId
+    API->>CS: startCrawl(siteId)
+    CS->>DB: getSiteDetails(siteId)
+    DB-->>CS: return site
+    CS->>Q: addJob(crawlJob)
+    Q-->>CS: jobId
+    CS-->>API: {jobId, status: 'queued'}
+    API-->>UI: {jobId, status: 'queued'}
+
+    %% Process Crawl Job
+    Q->>CS: processCrawlJob(jobId)
+    CS->>SB: crawlPage(url, options)
+    SB-->>CS: rawHtmlResponse
+    CS->>DP: processHtml(rawHtml)
+    DP-->>CS: parsedContent
+    CS->>DP: extractMetadata(rawHtml)
+    DP-->>CS: metadata
+    CS->>DP: generateContentHash(parsedContent)
+    DP-->>CS: contentHash
+
+    %% Save Results
+    CS->>DB: beginTransaction()
+    CS->>DB: saveCrawledPage(parsedContent, metadata)
+    CS->>DB: updateSiteStatus(siteId)
+    CS->>DB: commitTransaction()
+    DB-->>CS: success
+
+    %% Status Update
+    CS->>Q: markJobComplete(jobId)
+    Q-->>CS: success
+
+    %% Dashboard Update
+    UI->>API: GET /api/v1/crawl/:jobId
+    API->>CS: getCrawlStatus(jobId)
+    CS-->>API: status
+    API-->>UI: status
+
+    %% Error Handling
+    Note over CS,SB: If crawl fails
+    CS->>Q: retryJob(jobId)
+    Q-->>CS: newJobId
+
+    %% Batch Crawl Process
+    UI->>API: POST /api/v1/crawl/batch
+    API->>CS: startBatchCrawl(siteIds[])
+    loop For each site
+        CS->>Q: addJob(site)
+        Q-->>CS: jobId
+    end
+    CS-->>API: {batchId, jobIds[]}
+    API-->>UI: {batchId, status: 'processing'}

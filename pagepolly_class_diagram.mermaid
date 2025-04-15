@@ -1,0 +1,86 @@
+classDiagram
+    class Site {
+        +id: number
+        +url: string
+        +name: string
+        +description: string
+        +crawlFrequency: interval
+        +lastSuccessfulCrawl: timestamp
+        +status: string
+        +createdAt: timestamp
+        +addSite(siteData: SiteData): Site
+        +updateSite(id: number, data: SiteData): Site
+        +deleteSite(id: number): void
+        +getCrawlHistory(id: number): CrawlHistory[]
+    }
+
+    class CrawledPage {
+        +id: number
+        +siteId: number
+        +url: string
+        +title: string
+        +content: string
+        +dateCrawled: timestamp
+        +statusCode: number
+        +depth: number
+        +responseTime: number
+        +headings: string
+        +links: string[]
+        +userAgent: string
+        +crawlerVersion: string
+        +source: string
+        +language: string
+        +isValid: boolean
+        +metaDescription: string
+        +metaKeywords: string
+        +contentHash: string
+        +savePage(): void
+        +updatePage(id: number): void
+        +markInvalid(id: number): void
+    }
+
+    class CrawlerService {
+        -apiKey: string
+        -config: CrawlerConfig
+        +initializeCrawler(config: CrawlerConfig): void
+        +startCrawl(siteId: number): Promise~CrawlJob~
+        +stopCrawl(jobId: string): void
+        +getCrawlStatus(jobId: string): CrawlStatus
+        +handleCrawlResults(results: CrawlResults): void
+    }
+
+    class ScrapingBeeAdapter {
+        -apiKey: string
+        +initialize(apiKey: string): void
+        +crawlPage(url: string, options: CrawlOptions): Promise~CrawlResponse~
+        +validateResponse(response: CrawlResponse): boolean
+    }
+
+    class QueueManager {
+        -queue: Queue
+        +addJob(job: CrawlJob): string
+        +removeJob(jobId: string): void
+        +processQueue(): void
+        +getQueueStatus(): QueueStatus
+    }
+
+    class DataProcessor {
+        +processHtml(html: string): ParsedContent
+        +extractMetadata(html: string): Metadata
+        +validateContent(content: ParsedContent): boolean
+        +generateContentHash(content: string): string
+    }
+
+    class DashboardService {
+        +getSiteStatistics(siteId: number): SiteStats
+        +getSystemMetrics(): SystemMetrics
+        +generateReport(params: ReportParams): Report
+        +getAlerts(): Alert[]
+    }
+
+    Site "1" -- "*" CrawledPage
+    CrawlerService -- ScrapingBeeAdapter
+    CrawlerService -- QueueManager
+    CrawlerService -- DataProcessor
+    DashboardService -- Site
+    DashboardService -- CrawledPage
