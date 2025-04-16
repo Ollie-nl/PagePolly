@@ -1,61 +1,104 @@
 sequenceDiagram
-    participant UI as Frontend
-    participant API as API Gateway
-    participant CS as CrawlerService
-    participant SB as ScrapingBeeAdapter
-    participant Q as QueueManager
-    participant DP as DataProcessor
-    participant DB as PostgreSQL
+    participant U as User
+    participant FE as Frontend
+    participant API as API Server
+    participant VS as VendorService
+    participant CS as CrawlService
+    participant VR as VendorRepository
+    participant CR as CrawlRepository
+    participant CF as CrawlerFactory
+    participant SC as ScrapingBeeCrawler
+    participant DB as PostgreSQL Database
+    participant EXT as External Crawl API
+    participant RS as ResultService
+    participant RR as ResultRepository
 
-    %% Initialize Crawl Job
-    UI->>API: POST /api/v1/crawl/:siteId
-    API->>CS: startCrawl(siteId)
-    CS->>DB: getSiteDetails(siteId)
-    DB-->>CS: return site
-    CS->>Q: addJob(crawlJob)
-    Q-->>CS: jobId
-    CS-->>API: {jobId, status: 'queued'}
-    API-->>UI: {jobId, status: 'queued'}
+    %% Initialize Application Flow
+    U->>FE: Open Dashboard
+    FE->>API: GET /api/vendors
+    API->>VS: getAll()
+    VS->>VR: findAll()
+    VR->>DB: SELECT * FROM sites
+    DB-->>VR: Return vendors
+    VR-->>VS: Return vendors
+    VS-->>API: Return vendors
+    API-->>FE: Return vendors JSON
+    FE->>API: GET /api/crawls/status
+    API->>CS: getAllCrawls(status='running')
+    CS->>CR: findAll({status: 'running'})
+    CR->>DB: SELECT * FROM crawl_jobs WHERE status='running'
+    DB-->>CR: Return active crawl jobs
+    CR-->>CS: Return active crawl jobs
+    CS-->>API: Return active crawl jobs
+    API-->>FE: Return crawl status JSON
+    FE->>U: Display dashboard with vendors and crawl status
 
-    %% Process Crawl Job
-    Q->>CS: processCrawlJob(jobId)
-    CS->>SB: crawlPage(url, options)
-    SB-->>CS: rawHtmlResponse
-    CS->>DP: processHtml(rawHtml)
-    DP-->>CS: parsedContent
-    CS->>DP: extractMetadata(rawHtml)
-    DP-->>CS: metadata
-    CS->>DP: generateContentHash(parsedContent)
-    DP-->>CS: contentHash
+    %% Add Vendor Flow
+    U->>FE: Add new vendor (form submit)
+    FE->>API: POST /api/vendors
+    API->>VS: create(vendorData)
+    VS->>VR: create(vendorData)
+    VR->>DB: INSERT INTO sites (url, name, description)
+    DB-->>VR: Return created vendor
+    VR-->>VS: Return created vendor
+    VS-->>API: Return created vendor
+    API-->>FE: Return vendor JSON
+    FE->>U: Display success message
 
-    %% Save Results
-    CS->>DB: beginTransaction()
-    CS->>DB: saveCrawledPage(parsedContent, metadata)
-    CS->>DB: updateSiteStatus(siteId)
-    CS->>DB: commitTransaction()
-    DB-->>CS: success
+    %% Start Crawl Flow
+    U->>FE: Click 'Start Crawl' for vendor
+    FE->>API: POST /api/crawls (vendorId)
+    API->>CS: startCrawl(vendorId)
+    CS->>VS: getById(vendorId)
+    VS->>VR: findById(vendorId)
+    VR->>DB: SELECT * FROM sites WHERE id=vendorId
+    DB-->>VR: Return vendor
+    VR-->>VS: Return vendor
+    VS-->>CS: Return vendor
+    CS->>CR: create({site_id: vendorId, status: 'pending'})
+    CR->>DB: INSERT INTO crawl_jobs (site_id, started_at, status)
+    DB-->>CR: Return created job
+    CR-->>CS: Return created job
+    CS->>CF: createCrawler('scrapingbee', config)
+    CF-->>CS: Return ScrapingBeeCrawler instance
+    CS->>SC: crawlUrl(vendor.url)
+    SC->>EXT: HTTP Request to ScrapingBee API
+    EXT-->>SC: Return crawled content
+    SC-->>CS: Return CrawlResult
+    CS->>CR: saveCrawlResults(jobId, results)
+    CR->>DB: INSERT INTO crawled_pages
+    DB-->>CR: Confirm insertion
+    CR-->>CS: Return success
+    CS->>CR: update(jobId, {status: 'completed'})
+    CR->>DB: UPDATE crawl_jobs SET status='completed'
+    DB-->>CR: Confirm update
+    CR-->>CS: Return updated job
+    CS-->>API: Return job status
+    API-->>FE: Return job status JSON
+    FE->>U: Update UI with crawl completion
 
-    %% Status Update
-    CS->>Q: markJobComplete(jobId)
-    Q-->>CS: success
+    %% View Results Flow
+    U->>FE: Click on vendor to view results
+    FE->>API: GET /api/results/vendor/{vendorId}
+    API->>RS: getResultsByVendor(vendorId)
+    RS->>RR: findByVendorId(vendorId)
+    RR->>DB: SELECT * FROM crawled_pages WHERE site_id=vendorId
+    DB-->>RR: Return crawled pages
+    RR->>DB: SELECT * FROM product_occurrences JOIN products WHERE crawled_page_id IN (...)
+    DB-->>RR: Return product occurrences
+    RR-->>RS: Return results
+    RS-->>API: Return results
+    API-->>FE: Return results JSON
+    FE->>U: Display vendor crawl results
 
-    %% Dashboard Update
-    UI->>API: GET /api/v1/crawl/:jobId
-    API->>CS: getCrawlStatus(jobId)
-    CS-->>API: status
-    API-->>UI: status
-
-    %% Error Handling
-    Note over CS,SB: If crawl fails
-    CS->>Q: retryJob(jobId)
-    Q-->>CS: newJobId
-
-    %% Batch Crawl Process
-    UI->>API: POST /api/v1/crawl/batch
-    API->>CS: startBatchCrawl(siteIds[])
-    loop For each site
-        CS->>Q: addJob(site)
-        Q-->>CS: jobId
-    end
-    CS-->>API: {batchId, jobIds[]}
-    API-->>UI: {batchId, status: 'processing'}
+    %% Export Report Flow
+    U->>FE: Click 'Export Report'
+    FE->>API: POST /api/reports/export (format='pdf')
+    API->>RS: generateReport(filters)
+    RS->>RR: findAll(filters)
+    RR->>DB: Complex JOIN query for report data
+    DB-->>RR: Return report data
+    RR-->>RS: Return results
+    RS-->>API: Return PDF/CSV data
+    API-->>FE: Return file
+    FE->>U: Download report file
