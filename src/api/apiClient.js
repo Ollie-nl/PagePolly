@@ -1,11 +1,8 @@
 import axios from 'axios';
 
-// Default base URL - use a relative URL for production builds
-const baseURL = '/api';
-
-// Create Axios instance
+// Create Axios instance with default config
 const apiClient = axios.create({
-  baseURL,
+  baseURL: '/api',
   timeout: 30000, // 30 seconds timeout
   headers: {
     'Content-Type': 'application/json',
@@ -107,7 +104,6 @@ const api = {
   
   // Configure API base URL (e.g., for different environments)
   setBaseURL: (url) => {
-    baseURL = url;
     apiClient.defaults.baseURL = url;
   }
 };
