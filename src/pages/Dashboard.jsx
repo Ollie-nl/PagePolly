@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchVendors } from '../store/reducers/vendorSlice';
-import { fetchCrawlStatus, fetchCrawlHistory } from '../store/reducers/crawlSlice';
+import { getActiveCrawls, getCrawlHistory } from '../store/reducers/crawlSlice';
 
 function Dashboard() {
   const dispatch = useDispatch();
   const { items: vendors } = useSelector((state) => state.vendors);
-  const { activeJobs, progress } = useSelector((state) => state.crawls);
+  const { activeJob, history } = useSelector((state) => state.crawl);
   const [stats, setStats] = useState({
     totalVendors: 0,
     crawledVendors: 0,
@@ -19,12 +19,12 @@ function Dashboard() {
   useEffect(() => {
     // Fetch required data for the dashboard
     dispatch(fetchVendors());
-    dispatch(fetchCrawlStatus());
-    dispatch(fetchCrawlHistory());
+    dispatch(getActiveCrawls());
+    dispatch(getCrawlHistory());
 
     // Set up polling for active crawl jobs status
     const intervalId = setInterval(() => {
-      dispatch(fetchCrawlStatus());
+      dispatch(getActiveCrawls());
     }, 5000);
 
     return () => clearInterval(intervalId);
@@ -34,22 +34,18 @@ function Dashboard() {
   useEffect(() => {
     if (vendors.length > 0) {
       // Calculate basic stats based on vendors and crawl data
+      const completedJobs = history.filter(job => job.status === 'completed');
       setStats({
         totalVendors: vendors.length,
-        crawledVendors: vendors.filter(vendor => 
-          progress[vendor.id]?.percentage === 100 || 
-          progress[vendor.id]?.status === 'completed'
-        ).length,
-        totalCrawls: Object.keys(progress).length,
-        completedCrawls: Object.values(progress).filter(
-          p => p.percentage === 100 || p.status === 'completed'
-        ).length,
+        crawledVendors: completedJobs.length > 0 ? Math.min(vendors.length, completedJobs.length) : 0,
+        totalCrawls: history.length,
+        completedCrawls: completedJobs.length,
         // Mock data for now
         averageResponseTime: 245,
-        totalPages: vendors.length * 5 // Mock pages per vendor
+        totalPages: completedJobs.length * 5 // Mock pages per vendor
       });
     }
-  }, [vendors, progress]);
+  }, [vendors, history]);
 
   return (
     <div className="space-y-6">
@@ -104,7 +100,7 @@ function Dashboard() {
       {/* Active crawl jobs */}
       <div className="bg-white p-6 rounded-lg shadow">
         <h2 className="text-lg font-medium mb-4">Active Crawl Jobs</h2>
-        {activeJobs.length === 0 ? (
+        {!activeJob ? (
           <p className="text-gray-500">No active crawl jobs</p>
         ) : (
           <div className="overflow-x-auto">
@@ -112,7 +108,7 @@ function Dashboard() {
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Vendor
+                    Target URL
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -126,34 +122,28 @@ function Dashboard() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {activeJobs.map(job => {
-                  const vendor = vendors.find(v => v.id === job.vendorId);
-                  return (
-                    <tr key={job.id}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{vendor?.name || 'Unknown'}</div>
-                        <div className="text-sm text-gray-500">{vendor?.url || 'No URL'}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          {job.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="w-full bg-gray-200 rounded-full h-2.5">
-                          <div 
-                            className="bg-blue-600 h-2.5 rounded-full" 
-                            style={{ width: `${progress[job.id]?.percentage || 0}%` }}
-                          ></div>
-                        </div>
-                        <span className="text-xs text-gray-500">{progress[job.id]?.percentage || 0}% Complete</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(job.started_at).toLocaleString()}
-                      </td>
-                    </tr>
-                  );
-                })}
+                <tr key={activeJob.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">{activeJob.targetUrl || 'Unknown URL'}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                      {activeJob.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="w-full bg-gray-200 rounded-full h-2.5">
+                      <div 
+                        className="bg-blue-600 h-2.5 rounded-full" 
+                        style={{ width: `${activeJob.progress || 0}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-xs text-gray-500">{activeJob.progress || 0}% Complete</span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {new Date(activeJob.startTime || Date.now()).toLocaleString()}
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>

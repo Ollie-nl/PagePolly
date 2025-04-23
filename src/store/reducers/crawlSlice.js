@@ -1,146 +1,206 @@
+// src/store/reducers/crawlSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import apiClient from '../../api/apiClient';
+import { 
+  startCrawlJob,
+  getCrawlJobDetails,
+  getActiveCrawlJobs,
+  getCrawlHistory as fetchCrawlHistory,
+  cancelCrawlJob
+} from '../../api/crawlerApi';
 
+// Async thunks for crawler operations
 export const startCrawl = createAsyncThunk(
-  'crawls/start',
-  async (vendorId, { rejectWithValue }) => {
+  'crawl/startCrawl',
+  async (data, { rejectWithValue }) => {
     try {
-      const response = await apiClient.post('/api/crawls', { vendorId });
-      return response.data;
+      const response = await startCrawlJob(data);
+      return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Failed to start crawl');
+      return rejectWithValue(error.response?.data || { message: error.message });
     }
   }
 );
 
-export const fetchCrawlStatus = createAsyncThunk(
-  'crawls/fetchStatus',
+export const getCrawlDetails = createAsyncThunk(
+  'crawl/getCrawlDetails',
+  async (jobId, { rejectWithValue }) => {
+    try {
+      const response = await getCrawlJobDetails(jobId);
+      return response;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || { message: error.message });
+    }
+  }
+);
+
+export const getActiveCrawls = createAsyncThunk(
+  'crawl/getActiveCrawls',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await apiClient.get('/api/crawls/status');
-      return response.data;
+      const response = await getActiveCrawlJobs();
+      return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Failed to fetch crawl status');
+      return rejectWithValue(error.response?.data || { message: error.message });
     }
   }
 );
 
-export const fetchCrawlHistory = createAsyncThunk(
-  'crawls/fetchHistory',
-  async (filters = {}, { rejectWithValue }) => {
+export const getCrawlHistory = createAsyncThunk(
+  'crawl/getCrawlHistory',
+  async (params, { rejectWithValue }) => {
     try {
-      const response = await apiClient.get('/api/crawls', { params: filters });
-      return response.data;
+      const response = await fetchCrawlHistory(params);
+      return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Failed to fetch crawl history');
+      return rejectWithValue(error.response?.data || { message: error.message });
     }
   }
 );
 
 export const cancelCrawl = createAsyncThunk(
-  'crawls/cancel',
+  'crawl/cancelCrawl',
   async (jobId, { rejectWithValue }) => {
     try {
-      const response = await apiClient.post(`/api/crawls/${jobId}/cancel`);
-      return response.data;
+      const response = await cancelCrawlJob(jobId);
+      return response;
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Failed to cancel crawl job');
+      return rejectWithValue(error.response?.data || { message: error.message });
     }
   }
 );
 
 const initialState = {
+  activeJob: null,
+  selectedJob: null,
   history: [],
-  activeJobs: [],
-  status: 'idle',
+  loading: false,
   error: null,
-  progress: {},
-  statistics: {}
+  successMessage: null
 };
 
 const crawlSlice = createSlice({
-  name: 'crawls',
+  name: 'crawl',
   initialState,
   reducers: {
-    updateProgress: (state, action) => {
-      state.progress = {
-        ...state.progress,
-        ...action.payload
-      };
-    },
-    clearCrawlError: (state) => {
+    clearCrawlState: (state) => {
       state.error = null;
+      state.successMessage = null;
+    },
+    clearActiveJob: (state) => {
+      state.activeJob = null;
+    },
+    clearSelectedJob: (state) => {
+      state.selectedJob = null;
     }
   },
   extraReducers: (builder) => {
     builder
-      // Start crawl
+      // Start Crawl
       .addCase(startCrawl.pending, (state) => {
-        state.status = 'loading';
+        state.loading = true;
+        state.error = null;
       })
       .addCase(startCrawl.fulfilled, (state, action) => {
-        state.status = 'succeeded';
-        state.activeJobs.push(action.payload);
-        // Initialize progress for this job
-        state.progress[action.payload.id] = {
-          percentage: 0,
-          status: 'started'
-        };
+        state.loading = false;
+        state.activeJob = action.payload;
+        state.successMessage = 'Crawl job started successfully';
       })
       .addCase(startCrawl.rejected, (state, action) => {
-        state.status = 'failed';
-        state.error = action.payload;
+        state.loading = false;
+        state.error = action.payload?.message || 'Failed to start crawl job';
       })
-      // Fetch crawl status
-      .addCase(fetchCrawlStatus.pending, (state) => {
-        state.status = 'loading';
+
+      // Get Crawl Details
+      .addCase(getCrawlDetails.pending, (state) => {
+        state.loading = true;
+        state.error = null;
       })
-      .addCase(fetchCrawlStatus.fulfilled, (state, action) => {
-        state.status = 'succeeded';
-        state.activeJobs = action.payload;
+      .addCase(getCrawlDetails.fulfilled, (state, action) => {
+        state.loading = false;
         
-        // Update progress based on active jobs
-        const progressUpdates = {};
-        action.payload.forEach(job => {
-          progressUpdates[job.id] = {
-            percentage: job.progress || 0,
-            status: job.status
-          };
-        });
-        state.progress = {
-          ...state.progress,
-          ...progressUpdates
-        };
+        // Update the active job if the ID matches
+        if (state.activeJob && state.activeJob.id === action.payload.id) {
+          state.activeJob = action.payload;
+          
+          // If the job is completed, failed, or cancelled, remove it as active
+          if (['completed', 'failed', 'cancelled'].includes(action.payload.status)) {
+            setTimeout(() => {
+              state.activeJob = null;
+            }, 5000); // Keep the active job visible for 5 seconds before removing it
+          }
+        }
+        
+        // Set as selected job
+        state.selectedJob = action.payload;
       })
-      .addCase(fetchCrawlStatus.rejected, (state, action) => {
-        state.status = 'failed';
-        state.error = action.payload;
+      .addCase(getCrawlDetails.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload?.message || 'Failed to get crawl job details';
       })
-      // Fetch crawl history
-      .addCase(fetchCrawlHistory.pending, (state) => {
-        state.status = 'loading';
+
+      // Get Active Crawls
+      .addCase(getActiveCrawls.pending, (state) => {
+        state.loading = true;
+        state.error = null;
       })
-      .addCase(fetchCrawlHistory.fulfilled, (state, action) => {
-        state.status = 'succeeded';
+      .addCase(getActiveCrawls.fulfilled, (state, action) => {
+        state.loading = false;
+        if (action.payload && action.payload.length > 0) {
+          state.activeJob = action.payload[0]; // Get the most recent active job
+        }
+      })
+      .addCase(getActiveCrawls.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload?.message || 'Failed to get active crawl jobs';
+      })
+
+      // Get Crawl History
+      .addCase(getCrawlHistory.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(getCrawlHistory.fulfilled, (state, action) => {
+        state.loading = false;
         state.history = action.payload;
       })
-      .addCase(fetchCrawlHistory.rejected, (state, action) => {
-        state.status = 'failed';
-        state.error = action.payload;
+      .addCase(getCrawlHistory.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload?.message || 'Failed to get crawl history';
       })
-      // Cancel crawl
+
+      // Cancel Crawl
+      .addCase(cancelCrawl.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
       .addCase(cancelCrawl.fulfilled, (state, action) => {
-        const index = state.activeJobs.findIndex(job => job.id === action.payload.id);
-        if (index !== -1) {
-          state.activeJobs[index] = action.payload;
+        state.loading = false;
+        
+        // Update the active job if it exists and matches the cancelled job
+        if (state.activeJob && state.activeJob.id === action.payload.id) {
+          state.activeJob.status = 'cancelled';
+          state.activeJob.completionTime = action.payload.completionTime;
+          
+          // Remove active job after a delay
+          setTimeout(() => {
+            state.activeJob = null;
+          }, 5000);
         }
-        if (state.progress[action.payload.id]) {
-          state.progress[action.payload.id].status = 'cancelled';
+        
+        // Update the selected job if it matches
+        if (state.selectedJob && state.selectedJob.id === action.payload.id) {
+          state.selectedJob.status = 'cancelled';
+          state.selectedJob.completionTime = action.payload.completionTime;
         }
+        
+        state.successMessage = 'Crawl job cancelled successfully';
+      })
+      .addCase(cancelCrawl.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload?.message || 'Failed to cancel crawl job';
       });
   }
 });
 
-export const { updateProgress, clearCrawlError } = crawlSlice.actions;
-
+export const { clearCrawlState, clearActiveJob, clearSelectedJob } = crawlSlice.actions;
 export default crawlSlice.reducer;

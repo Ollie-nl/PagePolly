@@ -1,191 +1,239 @@
 # PagePolly Web Crawler Setup Guide
 
-This guide provides step-by-step instructions to set up and configure both the frontend and backend components of the PagePolly web crawler system. The crawler allows you to monitor vendor websites by crawling web pages and storing structured information.
+This guide will help you set up and use the PagePolly web crawler service powered by ScrapingBee API. The crawler enables you to extract content, structure, and screenshots from websites.
 
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
-2. [Supabase Setup](#supabase-setup)
-3. [Frontend Setup](#frontend-setup)
-4. [Backend Setup](#backend-setup)
-5. [Running the Application](#running-the-application)
-6. [Using the Web Crawler](#using-the-web-crawler)
+2. [Quick Installation](#quick-installation)
+3. [Manual Setup](#manual-setup)
+4. [Configuration](#configuration)
+5. [Running the Crawler](#running-the-crawler)
+6. [API Endpoints](#api-endpoints)
 7. [Troubleshooting](#troubleshooting)
 
 ## Prerequisites
 
-Before you begin, ensure you have the following installed:
+Before you begin, ensure you have:
 
-- [Node.js](https://nodejs.org/) (v16 or higher)
-- [npm](https://www.npmjs.com/), [yarn](https://yarnpkg.com/), or [pnpm](https://pnpm.io/)
-- [Git](https://git-scm.com/)
-- A [Supabase](https://supabase.com/) account
+- Node.js v16 or higher installed
+- A ScrapingBee API key (get one at [ScrapingBee.com](https://www.scrapingbee.com/) - free trial available)
+- Supabase project configured with the necessary tables
 
-## Supabase Setup
+## Quick Installation
 
-1. **Create a new Supabase project**:
-   - Sign up or log in to [Supabase](https://supabase.com/)
-   - Create a new project with a name of your choice
-   - Note down the project URL and API keys (found in Project Settings > API)
+We provide an automated setup script to help you get started quickly:
 
-2. **Set up database tables**:
-   - Navigate to the SQL Editor in your Supabase dashboard
-   - Run the SQL from `database/init.sql` first to create the core tables
-   - Then run the SQL from `database/crawl_jobs.sql` to create the crawl jobs table
+```bash
+node setup-crawler.js
+```
 
-3. **Enable authentication**:
-   - Go to Authentication > Settings
-   - Enable Email auth provider (or other providers as needed)
-   - Configure site URL to match your frontend URL (e.g., http://localhost:5173 for development)
+The script will:
+- Check for required dependencies
+- Install necessary packages
+- Guide you through setting up your ScrapingBee API key
+- Create necessary directories and files
+- Generate a start script
 
-## Frontend Setup
+## Manual Setup
 
-1. **Clone the repository and install dependencies**:
-   
+If you prefer to set up manually or if the automated setup didn't work:
 
-2. **Set up environment variables**:
-   - Create a `.env` file in the root directory:
-   ```
-   VITE_SUPABASE_URL=your_supabase_url_here
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
-   ```
-   - Replace placeholders with your actual Supabase URL and anon key
+1. **Install dependencies**:
 
-3. **Verify the Supabase client configuration**:
-   - Check `src/lib/supabaseClient.js` to ensure it's correctly importing environment variables
+```bash
+cd server
+npm install
+cd ..
+```
 
-## Backend Setup
+2. **Configure environment variables**:
 
-1. **Install backend dependencies**:
-   
+Create or edit `.env` file in the project root with:
 
-2. **Set up backend environment variables**:
-   - Create a `.env` file in the root directory (if not already created):
-   ```
-   # Supabase Configuration
-   VITE_SUPABASE_URL=your_supabase_url_here
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key_here
-   SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key_here
-   
-   # Server Configuration
-   PORT=4000
-   NODE_ENV=development
-   
-   # Deployment Configuration
-   BASE_URL=http://localhost:5173
-   
-   # Crawler Configuration
-   MAX_CONCURRENT_CRAWLS=5
-   CRAWL_TIMEOUT=60000
-   ```
-   - Replace placeholders with your actual Supabase credentials
-   - The `SUPABASE_SERVICE_ROLE_KEY` is critical - get it from Supabase dashboard > Settings > API
+```
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+SCRAPING_BEE_API_KEY=your_scraping_bee_api_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+```
 
-3. **Install Puppeteer dependencies** (Linux only):
-   - If you're running on Linux, you may need additional dependencies for Puppeteer:
-   
 
-## Running the Application
+3. **Set up database tables**:
 
-1. **Start the frontend development server**:
-   
-   - This will start the React application at http://localhost:5173
+Execute the SQL script in the Supabase SQL Editor. Create a file named `database/crawl_jobs.sql` with:
 
-2. **Start the backend server**:
-   
-   - This will start the Express server at http://localhost:4000
+```sql
+-- Create table for storing crawl jobs
+CREATE TABLE IF NOT EXISTS crawl_jobs (
+  id UUID PRIMARY KEY,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  project_id TEXT NOT NULL,
+  urls TEXT[] NOT NULL,
+  status TEXT NOT NULL,
+  progress INTEGER NOT NULL DEFAULT 0,
+  start_time TIMESTAMP WITH TIME ZONE NOT NULL,
+  completion_time TIMESTAMP WITH TIME ZONE,
+  results JSONB DEFAULT '[]'::jsonb,
+  errors JSONB DEFAULT '[]'::jsonb,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW())
+);
 
-3. **Verify the connection**:
-   - Open your browser and navigate to http://localhost:5173
-   - You should be able to log in and access the dashboard
+-- Create indexes for better query performance
+CREATE INDEX IF NOT EXISTS crawl_jobs_user_id_idx ON crawl_jobs(user_id);
+CREATE INDEX IF NOT EXISTS crawl_jobs_project_id_idx ON crawl_jobs(project_id);
+CREATE INDEX IF NOT EXISTS crawl_jobs_status_idx ON crawl_jobs(status);
 
-## Using the Web Crawler
+-- Enable Row Level Security
+ALTER TABLE crawl_jobs ENABLE ROW LEVEL SECURITY;
 
-1. **Register and log in to the application**:
-   - Create a new account via the registration page
-   - Log in with your credentials
+-- RLS policies to secure the table
+CREATE POLICY "Users can view their own crawl jobs" ON crawl_jobs 
+  FOR SELECT USING (auth.uid() = user_id);
+  
+CREATE POLICY "Users can insert their own crawl jobs" ON crawl_jobs 
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+  
+CREATE POLICY "Users can update their own crawl jobs" ON crawl_jobs 
+  FOR UPDATE USING (auth.uid() = user_id);
+```
 
-2. **Create a project**:
-   - Navigate to the Projects section
-   - Click "New Project" and provide a name and description
+4. **Create authentication middleware**:
 
-3. **Create pages in your project**:
-   - Open your new project
-   - Add pages by providing titles and URLs to monitor
+Create file `server/src/middleware/authMiddleware.js`:
 
-4. **Start a crawl**:
-   - From the project view, select the pages you want to crawl
-   - Click "Start Crawl" to begin the process
-   - The system will queue your crawl job and begin processing
+```javascript
+// server/src/middleware/authMiddleware.js
+const { createClient } = require('@supabase/supabase-js');
+jwt = require('jsonwebtoken');
 
-5. **Monitor crawl progress**:
-   - View active crawl jobs in the "Active Crawls" section
-   - See detailed progress information and cancel jobs if needed
+// Initialize Supabase client
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-6. **Analyze results**:
-   - Once a crawl is complete, view the results in the project dashboard
-   - Examine screenshots, extracted elements, and page structure
+// Middleware to require authentication
+exports.requireAuth = async (req, res, next) => {
+  try {
+    // Get the token from the Authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: 'No authentication token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    
+    // Verify the token with Supabase
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      return res.status(401).json({ message: 'Invalid or expired authentication token' });
+    }
+    
+    // Set the user info on the request object
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error('Auth middleware error:', error);
+    res.status(500).json({ message: 'Server authentication error' });
+  }
+};
+
+// Middleware for optional authentication
+exports.optionalAuth = async (req, res, next) => {
+  try {
+    // Get the token from the Authorization header
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      // No token, continue as unauthenticated
+      return next();
+    }
+
+    const token = authHeader.split(' ')[1];
+    
+    // Verify the token with Supabase
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (!error && user) {
+      // Set the user info on the request object
+      req.user = user;
+    }
+    next();
+  } catch (error) {
+    // Continue as unauthenticated on error
+    next();
+  }
+};
+```
+
+## Running the Crawler
+
+After completing the setup:
+
+1. Start the crawler service:
+
+```bash
+node start-crawler.js
+```
+
+This will start the crawler API server on port 3001 (or the port specified in your environment variables).
+
+## API Endpoints
+
+The crawler service exposes the following REST API endpoints:
+
+- **POST /api/crawls**
+  - Start a new crawl job
+  - Request body: `{ "projectId": "project-id", "urls": ["https://example.com"] }`
+
+- **GET /api/crawls/:jobId**
+  - Get details of a specific crawl job
+
+- **GET /api/crawls**
+  - Get crawl history with optional filtering
+  - Query parameters: `projectId`, `status`, `limit`, `page`
+
+- **GET /api/crawls/status**
+  - Get all active crawl jobs for current user
+
+- **POST /api/crawls/:jobId/cancel**
+  - Cancel an active crawl job
+
+## Integration with PagePolly Frontend
+
+The frontend integration is handled through the Redux store and API client. The main components are:
+
+- **src/api/crawlerApi.js**: API client for the crawler service
+- **src/store/reducers/crawlSlice.js**: Redux slice for managing crawler state
+- **src/components/crawler/CrawlerInterface.jsx**: UI component for the crawler
 
 ## Troubleshooting
 
-### Frontend Issues
+### Common Issues
 
-1. **Authentication problems**:
-   - Check browser console for errors
-   - Verify Supabase URL and anon key in `.env`
-   - Ensure Supabase Site URL is configured correctly
+1. **Connection refused errors**:
+   - Ensure the crawler service is running
+   - Check if the port (default 3001) is available
 
-2. **API connection issues**:
-   - Confirm backend server is running
-   - Check browser console for CORS errors
-   - Verify `apiClient.js` is correctly configured
+2. **Authentication errors**:
+   - Verify your Supabase configuration
+   - Check that the user is properly authenticated
 
-### Backend Issues
+3. **ScrapingBee API errors**:
+   - Verify your API key is correct
+   - Check if you've reached your API usage limits
 
-1. **Server fails to start**:
-   - Check all required environment variables are set
-   - Verify Supabase service role key is correct
-   - Ensure port 4000 is available
+### Logs
 
-2. **Puppeteer errors**:
-   - On Linux, verify all dependencies are installed
-   - Increase memory limit if needed: `NODE_OPTIONS=--max_old_space_size=4096`
+To see more detailed logs, start the service with debug logging:
 
-3. **Crawl jobs fail**:
-   - Check server logs for detailed error messages
-   - Verify target URLs are accessible
-   - Increase crawler timeout for slow websites
+```bash
+DEBUG=crawler:* node start-crawler.js
+```
 
-### Database Issues
+## Additional Resources
 
-1. **Missing tables**:
-   - Verify SQL scripts were executed successfully
-   - Check Supabase console for error messages
-
-2. **Permission errors**:
-   - Verify Row Level Security (RLS) policies are correctly set up
-   - Check if service role key has necessary permissions
-
-## Advanced Configuration
-
-### Customizing Crawler Behavior
-
-You can customize how the crawler behaves by editing `server/services/crawlService.js`:
-
-- **Element extraction**: Modify the page evaluator function to target specific elements
-- **Crawl depth**: Change the crawler to follow links for deeper crawling
-- **Screenshot settings**: Adjust quality and dimensions of captured screenshots
-
-### Scaling Considerations
-
-For production use with many users or large crawl jobs:
-
-- **Database**: Consider enabling Supabase realtime for live updates
-- **Memory**: Monitor server memory usage and adjust MAX_CONCURRENT_CRAWLS
-- **Hosting**: Deploy the backend to a service with sufficient resources
-
-### Security Notes
-
-- Keep your Supabase service role key secure, never expose it publicly
-- Use environment variables for all sensitive credentials
-- Regularly update dependencies to patch security vulnerabilities
+- [ScrapingBee API Documentation](https://www.scrapingbee.com/documentation/)
+- [Supabase Authentication Documentation](https://supabase.com/docs/guides/auth)
+- [PagePolly Documentation](./docs/index.md)

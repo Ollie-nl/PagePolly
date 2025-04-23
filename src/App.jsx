@@ -9,6 +9,7 @@ import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import CrawlerPage from './pages/crawler/CrawlerPage';
 import { AuthProvider } from './hooks/useAuth';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
@@ -29,6 +30,7 @@ function App() {
               <Route path="vendors" element={<Vendors />} />
               <Route path="reports" element={<Reports />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="crawler/:projectId" element={<CrawlerPage />} />
               <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>

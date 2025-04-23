@@ -9,9 +9,9 @@ export default defineConfig(({ command, mode }) => {
   
   return {
     plugins: [react()],
-    base: './', // Use relative paths
+    base: '/', // Use absolute paths for production
     server: {
-      port: 5173,
+      port: 5174,
       strictPort: false,
     },
     define: {
