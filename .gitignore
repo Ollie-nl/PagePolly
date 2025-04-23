@@ -1,4 +1,3 @@
-cat > .gitignore << 'EOL'
 # Dependencies
 node_modules/
 .pnp
