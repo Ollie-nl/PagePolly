@@ -20,6 +20,9 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Import Supabase Edge Function proxy middleware
+const supabaseEdgeProxy = require('./middlewares/supabaseEdgeProxy');
+
 // Middleware
 app.use(cors());
 app.use(express.json());
@@ -30,10 +33,20 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, '../dist')));
 }
 
-// API routes
+// Import mock routes
+const mockRoutes = require('./routes/mockRoutes');
+
+// API routes - Mock routes need to be first to take precedence
+app.use('/api', mockRoutes);
+
+// Original routes - these will run if the mock routes don't handle the request
 app.use('/api/crawls', authMiddleware, crawlRoutes);
+
 // Add ScrapingBee proxy route - no auth required for testing purposes
 app.use('/api/scrapingbee', scrapingBeeProxy);
+
+// Add Supabase Edge Function proxy route
+app.use('/api/edge-functions', supabaseEdgeProxy);
 
 // Serve React app in production
 if (process.env.NODE_ENV === 'production') {

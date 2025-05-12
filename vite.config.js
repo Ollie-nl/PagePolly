@@ -8,7 +8,15 @@ export default defineConfig({
     include: ['react', 'react-dom']
   },
   server: {
-    port: 5175
+    port: 5175,
+    proxy: {
+      '/api': {
+        target: 'https://pagepolly-server-u0ndvd-e75ef-fb9511.mgx.dev',
+        changeOrigin: true,
+        secure: false,
+        ws: true
+      }
+    }
   },
   build: {
     outDir: 'dist',

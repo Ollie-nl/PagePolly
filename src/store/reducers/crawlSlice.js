@@ -102,7 +102,7 @@ const crawlSlice = createSlice({
       })
       .addCase(startCrawl.fulfilled, (state, action) => {
         state.loading = false;
-        state.activeJob = action.payload;
+        state.activeJob = action.payload.data || {};
         state.successMessage = 'Crawl job started successfully';
       })
       .addCase(startCrawl.rejected, (state, action) => {
@@ -117,13 +117,14 @@ const crawlSlice = createSlice({
       })
       .addCase(getCrawlDetails.fulfilled, (state, action) => {
         state.loading = false;
+        const jobDetails = action.payload.data || {};
         
         // Update the active job if the ID matches
-        if (state.activeJob && state.activeJob.id === action.payload.id) {
-          state.activeJob = action.payload;
+        if (state.activeJob && state.activeJob.id === jobDetails.id) {
+          state.activeJob = jobDetails;
           
           // If the job is completed, failed, or cancelled, remove it as active
-          if (['completed', 'failed', 'cancelled'].includes(action.payload.status)) {
+          if (['completed', 'failed', 'cancelled'].includes(jobDetails.status)) {
             setTimeout(() => {
               state.activeJob = null;
             }, 5000); // Keep the active job visible for 5 seconds before removing it
@@ -131,7 +132,7 @@ const crawlSlice = createSlice({
         }
         
         // Set as selected job
-        state.selectedJob = action.payload;
+        state.selectedJob = jobDetails;
       })
       .addCase(getCrawlDetails.rejected, (state, action) => {
         state.loading = false;
@@ -145,8 +146,9 @@ const crawlSlice = createSlice({
       })
       .addCase(getActiveCrawls.fulfilled, (state, action) => {
         state.loading = false;
-        if (action.payload && action.payload.length > 0) {
-          state.activeJob = action.payload[0]; // Get the most recent active job
+        const activeCrawls = action.payload.data || [];
+        if (activeCrawls.length > 0) {
+          state.activeJob = activeCrawls[0]; // Get the most recent active job
         }
       })
       .addCase(getActiveCrawls.rejected, (state, action) => {
@@ -161,7 +163,7 @@ const crawlSlice = createSlice({
       })
       .addCase(getCrawlHistory.fulfilled, (state, action) => {
         state.loading = false;
-        state.history = action.payload;
+        state.history = action.payload.data || [];
       })
       .addCase(getCrawlHistory.rejected, (state, action) => {
         state.loading = false;
@@ -175,11 +177,12 @@ const crawlSlice = createSlice({
       })
       .addCase(cancelCrawl.fulfilled, (state, action) => {
         state.loading = false;
+        const cancelledJob = action.payload.data || {};
         
         // Update the active job if it exists and matches the cancelled job
-        if (state.activeJob && state.activeJob.id === action.payload.id) {
+        if (state.activeJob && state.activeJob.id === cancelledJob.id) {
           state.activeJob.status = 'cancelled';
-          state.activeJob.completionTime = action.payload.completionTime;
+          state.activeJob.completionTime = cancelledJob.completionTime;
           
           // Remove active job after a delay
           setTimeout(() => {
@@ -188,9 +191,9 @@ const crawlSlice = createSlice({
         }
         
         // Update the selected job if it matches
-        if (state.selectedJob && state.selectedJob.id === action.payload.id) {
+        if (state.selectedJob && state.selectedJob.id === cancelledJob.id) {
           state.selectedJob.status = 'cancelled';
-          state.selectedJob.completionTime = action.payload.completionTime;
+          state.selectedJob.completionTime = cancelledJob.completionTime;
         }
         
         state.successMessage = 'Crawl job cancelled successfully';

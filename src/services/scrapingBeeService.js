@@ -1,10 +1,13 @@
 // src/services/scrapingBeeService.js
 import axios from 'axios';
 import { SCRAPINGBEE_CONFIG } from '../config/config';
+import proxyApi from '../api/proxyApiClient';
 
 class ScrapingBeeService {
   constructor() {
+    // Use local proxy instead of direct ScrapingBee API access
     this.baseUrl = 'https://app.scrapingbee.com/api/v1';
+    this.proxyUrl = '/api/scrapingbee'; // Local Express server proxy route
     this.axiosInstance = axios.create({
       timeout: 30000, // 30 second timeout
     });
@@ -73,30 +76,23 @@ class ScrapingBeeService {
       
       console.log('Checking credit balance with API key:', cleanApiKey ? '****' + cleanApiKey.substring(cleanApiKey.length - 4) : 'MISSING');
       
-      const accountUrl = `${this.baseUrl}/account?api_key=${cleanApiKey}`;
-      console.log('Account URL:', accountUrl);
+      // Use the API proxy instead of direct access
+      // Important: The server expects a GET request for the test endpoint, not POST
+      const response = await proxyApi.get(
+        `${this.proxyUrl}/test`, // Use the test endpoint of our proxy
+        {
+          signal: this.abortController.signal
+        }
+      );
       
-      const response = await this.axiosInstance({
-        method: 'GET',
-        url: accountUrl,
-        signal: this.abortController.signal,
-        validateStatus: status => true,
-        responseType: 'text'
-      });
-      
-      console.log('Account API response status:', response.status);
-      
-      if (response.status !== 200) {
-        console.error('Error response from account API:', response.data);
-        throw new Error(`Account API returned status: ${response.status}`);
+      if (!response.data || !response.data.success) {
+        throw new Error(response.data?.message || 'Failed to connect to ScrapingBee API');
       }
-      
-      const responseData = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
       
       return {
         success: true,
-        credits: responseData.remaining_credits,
-        message: `Remaining credits: ${responseData.remaining_credits}`
+        credits: response.data.credits || 1, // Credits used for this test request
+        message: 'API connection successful'
       };
     } catch (error) {
       if (axios.isCancel(error)) {
@@ -152,55 +148,42 @@ class ScrapingBeeService {
         throw new Error('API key is missing. Please configure it in Settings.');
       }
       
-      // Clean the API key - remove any whitespace
-      const cleanApiKey = apiKey.trim();
-      
-      // Directly create the URL exactly like the working example with ALL parameters
-      const encodedUrl = encodeURIComponent(url);
-      const apiUrl = `${this.baseUrl}?api_key=${cleanApiKey}&url=${encodedUrl}&render_js=false&json_response=true&return_page_source=true`;
-      
+      // We don't need to clean the API key here as it's passed to crawlerService
+      // and not used directly for API calls (the server handles this)
       console.log('----------------------------------');
-      console.log('EXACT API CALL:');
-      console.log(`Scraping URL: ${url}`);
-      console.log(`API Key: ${apiKey}`);
-      console.log(`Full API URL: ${apiUrl}`);
-      console.log('Full working example: https://app.scrapingbee.com/api/v1?api_key=YOUR_KEY&url=https%3A%2F%2Fferrum.audio&render_js=false&json_response=true&return_page_source=true');
+      console.log(`Scraping URL through local proxy: ${url}`);
+      console.log('API Key will be handled by server-side proxy');
       console.log('----------------------------------');
 
-      const response = await this.axiosInstance({
-        method: 'GET',
-        url: apiUrl,
-        signal: this.abortController.signal,
-        validateStatus: status => true, // Accept any status to get error details
-        responseType: 'text' // Use text instead of arraybuffer
-      });
+      // Use our local proxy API endpoint instead of direct ScrapingBee access
+      const response = await proxyApi.post(
+        `${this.proxyUrl}/scrape`,
+        {
+          url: url,
+          // Additional options can be passed here
+          render_js: false,
+          // No need to include API key as the server handles it
+        },
+        {
+          signal: this.abortController.signal,
+          validateStatus: status => true // Accept any status to get error details
+        }
+      );
 
       console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
       
       // Handle non-200 responses
-      if (response.status !== 200) {
-        console.error('Error response body:', response.data);
-        throw new Error(`ScrapingBee API returned status: ${response.status}, Body: ${response.data}`);
+      if (response.status !== 200 || !response.data.success) {
+        console.error('Error response:', response.data);
+        throw new Error(response.data.message || `Failed with status: ${response.status}`);
       }
 
-      // Try to parse as JSON if possible
-      let parsedData;
-      try {
-        parsedData = JSON.parse(response.data);
-      } catch (e) {
-        // Not JSON, use as HTML/text
-        parsedData = null;
-      }
-      
-      const finalData = parsedData || response.data;
-      
       return {
         success: true,
-        data: finalData,
-        pageSource: response.data,
-        credits: response.headers['x-credit-used'] || 1,
-        message: 'Successfully scraped URL'
+        data: response.data,
+        pageSource: response.data.pageSource,
+        credits: response.data.credits || 1,
+        message: response.data.message || 'Successfully scraped URL'
       };
 
     } catch (error) {
@@ -217,9 +200,9 @@ class ScrapingBeeService {
       console.error('Scraping error details:', error);
       let errorMessage = 'Failed to scrape URL';
       if (error.response) {
-        errorMessage = `Server returned ${error.response.status}: ${error.response.data}`;
+        errorMessage = `Server returned ${error.response.status}: ${error.response.data?.message || error.response.data}`;
       } else if (error.request) {
-        errorMessage = 'No response received from ScrapingBee API';
+        errorMessage = 'No response received from ScrapingBee proxy';
       }
 
       return {
@@ -253,27 +236,28 @@ class ScrapingBeeService {
         throw new Error('API key cannot be empty');
       }
       
-      console.log('Starting API connection test with key (masked):', '****' + cleanApiKey.substring(cleanApiKey.length - 4));
+      console.log('Starting API connection test through local proxy...');
       
       // Test with the same URL that works in the curl command
       const testUrl = 'https://ferrum.audio';
       console.log(`Testing with URL: ${testUrl}`);
       
-      // Skip the credit balance check to simplify troubleshooting
-      const testResult = await this.scrape(testUrl, cleanApiKey);
+      // Use the local proxy to test connection
+      // Important: The server expects a GET request for the test endpoint, not POST
+      const response = await proxyApi.get(
+        `${this.proxyUrl}/test`
+      );
       
-      if (!testResult.success) {
-        console.error('Test failed with error:', testResult.message);
-        throw new Error(testResult.message);
+      if (!response.data || !response.data.success) {
+        throw new Error(response.data?.message || 'Connection test failed');
       }
       
-      console.log('Test successful! Response received:', testResult.data ? 'Data received' : 'No data');
+      console.log('Test successful! Connection to API verified');
       
       return {
         success: true,
         message: 'Connection successful.',
-        pageSource: testResult.pageSource,
-        data: testResult.data
+        credits: response.data.credits
       };
       
     } catch (error) {

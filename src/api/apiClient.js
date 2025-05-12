@@ -3,18 +3,23 @@ import supabaseClient from '../lib/supabaseClient';
 
 // Create Axios instance with default config
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_SUPABASE_URL,
+  baseURL: '',  // Empty baseURL for relative URLs
   timeout: 30000, // 30 seconds timeout
   headers: {
     'Content-Type': 'application/json',
-    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+    // Add CORS headers
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
   }
 });
 
 // Request interceptor for adding auth token
 apiClient.interceptors.request.use(
-  config => {
-    const session = supabaseClient.auth.getSession();
+  async (config) => {
+    const { data: { session } } = await supabaseClient.auth.getSession();
     if (session?.access_token) {
       config.headers['Authorization'] = `Bearer ${session.access_token}`;
     }

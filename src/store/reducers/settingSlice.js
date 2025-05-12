@@ -136,6 +136,13 @@ const settingsSlice = createSlice({
   },
   reducers: {
     setActiveConfig: (state, action) => {
+      console.log('Setting active config in reducer:', action.payload);
+      // Ensure API key is properly set
+      if (action.payload && action.payload.api_key) {
+        console.log('Active config has API key (masked):', '****' + action.payload.api_key.substring(action.payload.api_key.length - 4));
+      } else {
+        console.warn('Active config is missing API key:', action.payload);
+      }
       state.activeConfig = action.payload;
     },
     clearTestStatus: (state) => {

@@ -1,5 +1,6 @@
 // src/components/VendorManagement.jsx
 import React, { useState, useEffect } from 'react';
+import { useSelector } from 'react-redux';
 import { DatabaseService } from '../services/database';
 import CrawlButton from './CrawlButton';
 
@@ -13,6 +14,9 @@ const VendorManagement = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [loading, setLoading] = useState(false);
+  
+  // Get settings from Redux store
+  const settings = useSelector(state => state.settings.activeConfig);
 
   useEffect(() => {
     loadVendors();
@@ -174,7 +178,8 @@ const VendorManagement = () => {
                 </div>
                 <div className="flex items-center gap-4">
                   <CrawlButton 
-                    url={vendor.url}
+                    vendorId={vendor.id}
+                    settings={settings}
                     onCrawlComplete={(job) => {
                       if (job.status === 'completed') {
                         setSuccess(`Crawl completed for ${vendor.name}`);
