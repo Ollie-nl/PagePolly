@@ -3,7 +3,7 @@
  * Client-side service to interact with the server-side ScrapingBee proxy
  */
 
-import apiClient from '../api/apiClient';
+import proxyApi from '../api/proxyApiClient';
 
 /**
  * Base API endpoint for the ScrapingBee proxy
@@ -20,7 +20,7 @@ const scrapingBeeProxyService = {
    */
   testConnection: async () => {
     try {
-      const response = await apiClient.get(`${PROXY_ENDPOINT}/test`);
+      const response = await proxyApi.get(`${PROXY_ENDPOINT}/test`);
       return response.data;
     } catch (error) {
       console.error('ScrapingBee connection test failed:', error);
@@ -54,7 +54,7 @@ const scrapingBeeProxyService = {
         return_page_source: true
       };
 
-      const response = await apiClient.post(`${PROXY_ENDPOINT}/scrape`, {
+      const response = await proxyApi.post(`${PROXY_ENDPOINT}/scrape`, {
         url,
         ...defaultOptions,
         ...options

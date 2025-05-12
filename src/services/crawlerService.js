@@ -36,12 +36,12 @@ class CrawlerService {
     return data;
   }
 
-  async startCrawl(settingsId, apiKey) {
+  async startCrawl(vendorId, apiKey) {
     const { data: { user } } = await supabaseClient.auth.getUser();
     const sessionId = uuidv4();
     
     // Debug log to verify parameters
-    console.log('startCrawl called with:', { settingsId, apiKeyProvided: !!apiKey });
+    console.log('startCrawl called with:', { vendorId, apiKeyProvided: !!apiKey });
     
     if (!apiKey) {
       console.error('API key is undefined or null in startCrawl');
@@ -60,17 +60,32 @@ class CrawlerService {
     
     console.log(`Using API key (last 4 chars): ...${cleanApiKey.slice(-4)}`);
     
-    const { data, error } = await supabaseClient.functions.invoke('start-crawler', {
-      body: {
-        settings_id: settingsId,
-        user_email: user.email,
-        session_id: sessionId,
-        api_key: cleanApiKey  // Pass the cleaned API key to the Edge Function
+    try {
+      // Use our server-side proxy instead of direct Supabase Edge Function call
+      const response = await fetch('/api/edge-functions/start-crawler', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          vendor_id: vendorId,
+          user_email: user.email,
+          session_id: sessionId,
+          api_key: cleanApiKey  // Pass the cleaned API key to our proxy
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to start crawler');
       }
-    });
-
-    if (error) throw error;
-    return { sessionId, ...data };
+      
+      const data = await response.json();
+      return { sessionId, ...data };
+    } catch (error) {
+      console.error('Error starting crawl:', error);
+      throw error;
+    }
   }
 
   async getCrawlResults(sessionId) {
@@ -89,15 +104,30 @@ class CrawlerService {
   async stopCrawl(sessionId) {
     const { data: { user } } = await supabaseClient.auth.getUser();
     
-    const { data, error } = await supabaseClient.functions.invoke('stop-crawler', {
-      body: {
-        session_id: sessionId,
-        user_email: user.email
+    try {
+      // Use our server-side proxy instead of direct Supabase Edge Function call
+      const response = await fetch('/api/edge-functions/stop-crawler', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          user_email: user.email
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to stop crawler');
       }
-    });
-
-    if (error) throw error;
-    return data;
+      
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error stopping crawl:', error);
+      throw error;
+    }
   }
 }
 

@@ -16,12 +16,9 @@ const CrawlButton = ({ vendorId, settings, onCrawlComplete }) => {
   // Validate settings on component mount
   useEffect(() => {
     // Check if settings are properly loaded
-    if (!settings) {
-      console.warn('Settings not provided to CrawlButton component');
+    if (!settings || !settings.api_key) {
+      console.warn('Settings or API key not provided to CrawlButton component');
       setError('Settings not configured properly');
-    } else if (!settings.api_key) {
-      console.warn('API key not found in settings');
-      setError('API key is missing in settings');
     }
   }, [settings]);
   
@@ -184,8 +181,13 @@ const CrawlButton = ({ vendorId, settings, onCrawlComplete }) => {
     return 'bg-blue-600 hover:bg-blue-700';
   };
 
+  // Log settings for debugging
+  console.log('CrawlButton settings:', settings);
+  console.log('Settings API key exists:', settings && !!settings.api_key);
+  
   // If settings are missing, show a more helpful message
-  if (!settings || !settings.api_key) {
+  // Fix the check logic - if settings doesn't exist or api_key is undefined/null
+  if (!settings || settings.api_key === undefined || settings.api_key === null) {
     return (
       <div className="flex flex-col items-center gap-2">
         <button

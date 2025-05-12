@@ -49,7 +49,7 @@ const CrawlerInterface = ({ projectId }) => {
   // Get API key from settings at the top level
   const settings = useSelector(state => state.settings);
   const activeConfig = settings?.activeConfig;
-  const apiKey = activeConfig?.api_key || ''; // Ensure API key is available
+  const apiKey = activeConfig?.api_key?.trim() || ''; // Ensure API key is available and trimmed
 
   // Load crawl history when component mounts
   useEffect(() => {

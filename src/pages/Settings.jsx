@@ -12,6 +12,7 @@ import {
 import Modal from '../components/common/Modal';
 import scrapingBeeService from '../services/scrapingBeeService';
 import LoadingSpinner, { ButtonSpinner } from '../components/LoadingSpinner';
+import { toast } from 'react-hot-toast';
 
 function Settings() {
   const dispatch = useDispatch();
@@ -131,7 +132,10 @@ function Settings() {
   };
 
   const handleSetActive = (crawler) => {
+    console.log('Setting active crawler configuration:', crawler);
     dispatch(setActiveConfig(crawler));
+    // Add explicit toast notification when setting active config
+    toast.success(`${crawler.name} set as active configuration`);
   };
 
   const handleCopyUrl = async (url) => {

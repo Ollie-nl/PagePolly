@@ -7,7 +7,9 @@ import axios from 'axios';
 
 // Create a separate axios instance for crawler service
 const crawlerClient = axios.create({
-  baseURL: import.meta.env.VITE_CRAWLER_API_URL || 'http://localhost:3001',
+  // Use environment variable if available, otherwise use relative paths
+  // which will resolve against the current domain (important for deployment)
+  baseURL: import.meta.env.VITE_CRAWLER_API_URL || '',  // Empty string means use relative URLs
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json'

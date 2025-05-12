@@ -13,15 +13,11 @@ const path = require('path');
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-// Get API key from environment or config
-let apiKey;
-try {
-  const config = require('../../src/config/config');
-  apiKey = config.SCRAPINGBEE_CONFIG?.apiKey;
-} catch (error) {
-  console.log('Config import error:', error);
-  // Fallback to environment variable
-  apiKey = process.env.SCRAPINGBEE_API_KEY;
+// Get API key from environment
+let apiKey = process.env.SCRAPINGBEE_API_KEY;
+
+if (apiKey) {
+  console.log('Successfully loaded ScrapingBee API key from environment');
 }
 
 if (!apiKey) {
@@ -55,7 +51,7 @@ const scrapingBeeProxy = async (req, res) => {
     // Default parameters
     const params = {
       api_key: apiKey,
-      url: encodeURIComponent(url),
+      url: url, // Don't pre-encode, querystring will handle this properly
       render_js: false,
       json_response: true,
       return_page_source: true,
@@ -142,15 +138,25 @@ const testScrapingBeeConnection = async (req, res) => {
   try {
     // Test endpoint with a simple request
     const testUrl = 'https://httpbin.org/ip';
+    
+    // Important: Don't encode the URL as a parameter, ScrapingBee expects the URL parameter unencoded
+    // The querystring module will handle the proper encoding
     const params = {
       api_key: apiKey,
-      url: encodeURIComponent(testUrl),
+      url: testUrl,  // Don't pre-encode this
       json_response: true,
     };
 
     console.log('[ScrapingBeeProxy] Testing API connection...');
+    console.log('[ScrapingBeeProxy] API Key (first 5 chars):', apiKey.substring(0, 5) + '...');
+    
+    // Log the full URL structure (without the actual API key)
+    const debugUrl = `${SCRAPINGBEE_API_URL}?api_key=XXXXX&url=${testUrl}&json_response=true`;
+    console.log('[ScrapingBeeProxy] Request URL structure:', debugUrl);
     
     const apiUrl = `${SCRAPINGBEE_API_URL}?${querystring.stringify(params)}`;
+    console.log('[ScrapingBeeProxy] Actual request URL being used (sanitized):', apiUrl.replace(apiKey, 'XXXXX'));
+    
     const response = await axios({
       method: 'GET',
       url: apiUrl,
@@ -169,10 +175,41 @@ const testScrapingBeeConnection = async (req, res) => {
   } catch (error) {
     console.error('[ScrapingBeeProxy] Connection test failed:', error.message);
     
-    return res.status(500).json({
+    let errorDetails = 'Unknown error';
+    let statusCode = 500;
+    
+    // Get more detailed error information
+    if (error.response) {
+      // Server responded with non-2xx status
+      statusCode = error.response.status;
+      console.error(`[ScrapingBeeProxy] Error status: ${error.response.status}`);
+      console.error(`[ScrapingBeeProxy] Error headers:`, error.response.headers);
+      
+      if (error.response.data) {
+        console.error('[ScrapingBeeProxy] Error data:', typeof error.response.data === 'object' ? 
+          JSON.stringify(error.response.data, null, 2) : error.response.data);
+        
+        if (typeof error.response.data === 'string') {
+          errorDetails = error.response.data;
+        } else if (error.response.data.message) {
+          errorDetails = error.response.data.message;
+        }
+      }
+    } else if (error.request) {
+      // Request was made but no response
+      errorDetails = 'No response received from ScrapingBee API';
+      console.error('[ScrapingBeeProxy] No response received');
+    } else {
+      // Something else went wrong
+      errorDetails = error.message;
+      console.error('[ScrapingBeeProxy] Request setup error:', error.message);
+    }
+    
+    return res.status(statusCode).json({
       success: false,
-      message: 'ScrapingBee API connection test failed',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      message: 'ScrapingBee API connection test failed: ' + errorDetails,
+      error: error.message,
+      details: errorDetails
     });
   }
 };
