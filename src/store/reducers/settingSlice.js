@@ -98,7 +98,21 @@ export const testCrawlerConfig = createAsyncThunk(
   'settings/testCrawlerConfig',
   async (config, { rejectWithValue, signal }) => {
     try {
-      const result = await scrapingBeeService.testConnection(config.apiKey);
+      // Ensure API key is present and clean it
+      if (!config.apiKey) {
+        throw new Error('API key is required for testing');
+      }
+      
+      // Clean the API key by removing whitespace
+      const cleanApiKey = config.apiKey.trim();
+      
+      if (!cleanApiKey) {
+        throw new Error('API key cannot be empty');
+      }
+      
+      console.log('Testing API connection with key (masked):', '****' + cleanApiKey.substring(cleanApiKey.length - 4));
+      
+      const result = await scrapingBeeService.testConnection(cleanApiKey);
       if (!result.success) {
         throw new Error(result.message);
       }

@@ -3,7 +3,7 @@
  * Client-side service to interact with the server-side ScrapingBee proxy
  */
 
-import apiClient from '../apiClient';
+import apiClient from '../api/apiClient';
 
 /**
  * Base API endpoint for the ScrapingBee proxy

@@ -36,15 +36,36 @@ class CrawlerService {
     return data;
   }
 
-  async startCrawl(settingsId) {
+  async startCrawl(settingsId, apiKey) {
     const { data: { user } } = await supabaseClient.auth.getUser();
     const sessionId = uuidv4();
+    
+    // Debug log to verify parameters
+    console.log('startCrawl called with:', { settingsId, apiKeyProvided: !!apiKey });
+    
+    if (!apiKey) {
+      console.error('API key is undefined or null in startCrawl');
+      throw new Error('API key is required to start a crawl');
+    }
+    
+    // Ensure API key doesn't have any extra whitespace
+    // Make sure apiKey is a string before calling trim()
+    const cleanApiKey = typeof apiKey === 'string' ? apiKey.trim() : '';
+    
+    // Additional validation
+    if (!cleanApiKey) {
+      console.error('API key is empty after trimming');
+      throw new Error('API key cannot be empty');
+    }
+    
+    console.log(`Using API key (last 4 chars): ...${cleanApiKey.slice(-4)}`);
     
     const { data, error } = await supabaseClient.functions.invoke('start-crawler', {
       body: {
         settings_id: settingsId,
         user_email: user.email,
-        session_id: sessionId
+        session_id: sessionId,
+        api_key: cleanApiKey  // Pass the cleaned API key to the Edge Function
       }
     });
 

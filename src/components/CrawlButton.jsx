@@ -4,12 +4,26 @@ import crawlerService from '../services/crawlerService';
 import scrapingBeeService from '../services/scrapingBeeService';
 import supabaseClient from '../lib/supabaseClient';
 import { toast } from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 const CrawlButton = ({ vendorId, settings, onCrawlComplete }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [crawlStatus, setCrawlStatus] = useState(null);
   const [error, setError] = useState(null);
   const [progress, setProgress] = useState(0);
+  const navigate = useNavigate();
+  
+  // Validate settings on component mount
+  useEffect(() => {
+    // Check if settings are properly loaded
+    if (!settings) {
+      console.warn('Settings not provided to CrawlButton component');
+      setError('Settings not configured properly');
+    } else if (!settings.api_key) {
+      console.warn('API key not found in settings');
+      setError('API key is missing in settings');
+    }
+  }, [settings]);
   
   // Cleanup status check interval on unmount
   useEffect(() => {
@@ -49,10 +63,12 @@ const CrawlButton = ({ vendorId, settings, onCrawlComplete }) => {
         return 'failed';
       }
 
-      // Update progress
-      const pagesScraped = results.filter(r => r.status === 'completed').length;
-      const progressPercent = Math.round((pagesScraped / settings.max_pages) * 100);
-      setProgress(progressPercent);
+      // Update progress - ensure settings.max_pages exists
+      if (settings && settings.max_pages) {
+        const pagesScraped = results.filter(r => r.status === 'completed').length;
+        const progressPercent = Math.round((pagesScraped / settings.max_pages) * 100);
+        setProgress(progressPercent);
+      }
       
       return 'running';
     } catch (err) {
@@ -64,8 +80,24 @@ const CrawlButton = ({ vendorId, settings, onCrawlComplete }) => {
     }
   };
 
+  const redirectToSettings = () => {
+    toast.success('Please configure your API settings first'); // Changed from toast.info
+    navigate('/settings');
+  };
+
   const startCrawl = async () => {
     try {
+      // Check for valid settings first
+      if (!settings) {
+        throw new Error('Settings not configured');
+      }
+      
+      if (!settings.api_key) {
+        toast.error('ScrapingBee API key is missing. Please configure in Settings.');
+        redirectToSettings();
+        return;
+      }
+
       setIsLoading(true);
       setError(null);
       setCrawlStatus('starting');
@@ -77,15 +109,31 @@ const CrawlButton = ({ vendorId, settings, onCrawlComplete }) => {
         throw new Error('User not authenticated');
       }
 
-      // First test the ScrapingBee connection
-      const testResult = await scrapingBeeService.getCreditBalance(settings.api_key);
-      if (!testResult.success) {
-        throw new Error('Failed to connect to ScrapingBee API');
+      // First test the ScrapingBee connection with error handling
+      try {
+        const testResult = await scrapingBeeService.getCreditBalance(settings.api_key);
+        if (!testResult.success) {
+          throw new Error(`Failed to connect to ScrapingBee API: ${testResult.message}`);
+        }
+        console.log('ScrapingBee API connection successful, credits:', testResult.credits);
+      } catch (apiError) {
+        throw new Error(`ScrapingBee API error: ${apiError.message}`);
       }
 
       // Start new crawl job
       console.log('Starting crawl for vendor:', vendorId);
-      const { sessionId } = await crawlerService.startCrawl(vendorId);
+      console.log('Using API key (masked):', settings.api_key ? '****' + settings.api_key.substring(settings.api_key.length - 4) : 'MISSING');
+      
+      // Make absolutely sure the API key is passed correctly
+      // First, check and validate the API key
+      if (!settings.api_key) {
+        throw new Error('API key is missing in settings');
+      }
+      
+      // Now pass it explicitly to startCrawl
+      const apiKey = settings.api_key.trim();
+      console.log('About to call startCrawl with vendor ID and API key (masked):', vendorId, '****' + apiKey.slice(-4));
+      const { sessionId } = await crawlerService.startCrawl(vendorId, apiKey);
       
       setCrawlStatus('running');
       toast.success('Crawl started successfully');
@@ -119,6 +167,11 @@ const CrawlButton = ({ vendorId, settings, onCrawlComplete }) => {
   };
 
   const getButtonStyle = () => {
+    // Disable button if settings are missing
+    if (!settings || !settings.api_key) {
+      return 'bg-gray-400 cursor-not-allowed';
+    }
+    
     if (isLoading || crawlStatus === 'running') {
       return 'bg-blue-400 cursor-not-allowed';
     }
@@ -130,6 +183,24 @@ const CrawlButton = ({ vendorId, settings, onCrawlComplete }) => {
     }
     return 'bg-blue-600 hover:bg-blue-700';
   };
+
+  // If settings are missing, show a more helpful message
+  if (!settings || !settings.api_key) {
+    return (
+      <div className="flex flex-col items-center gap-2">
+        <button
+          onClick={redirectToSettings}
+          className="px-4 py-2 rounded-md text-white transition-colors bg-yellow-600 hover:bg-yellow-700"
+        >
+          Configure Settings First
+        </button>
+        <div className="text-amber-500 text-sm mt-1 p-2 bg-amber-50 rounded border border-amber-200">
+          <p>ScrapingBee API key is required to start crawling.</p>
+          <p>Click the button above to configure your settings.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center gap-2">

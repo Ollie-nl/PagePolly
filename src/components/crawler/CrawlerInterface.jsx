@@ -45,6 +45,11 @@ const CrawlerInterface = ({ projectId }) => {
   
   const crawlState = useSelector((state) => state.crawl);
   const { activeJob, history, selectedJob, loading } = crawlState;
+  
+  // Get API key from settings at the top level
+  const settings = useSelector(state => state.settings);
+  const activeConfig = settings?.activeConfig;
+  const apiKey = activeConfig?.api_key || ''; // Ensure API key is available
 
   // Load crawl history when component mounts
   useEffect(() => {
@@ -60,7 +65,7 @@ const CrawlerInterface = ({ projectId }) => {
   useEffect(() => {
     let interval;
     
-    if (activeJob && (activeJob.status === 'pending' || activeJob.status === 'running')) {
+    if (activeJob && activeJob.id && (activeJob.status === 'pending' || activeJob.status === 'running')) {
       interval = setInterval(() => {
         dispatch(getCrawlDetails(activeJob.id));
       }, 5000); // Poll every 5 seconds
@@ -100,14 +105,34 @@ const CrawlerInterface = ({ projectId }) => {
       return;
     }
     
+    // Verify API key is available
+    if (!apiKey) {
+      setError('Missing API key. Please configure API settings first.');
+      return;
+    }
+    
+    // Clean the API key
+    const cleanApiKey = apiKey.trim();
+    
+    if (!cleanApiKey) {
+      setError('API key cannot be empty. Please configure a valid API key in Settings.');
+      return;
+    }
+    
     // Clear any previous errors
     setError('');
+    
+    // Log API key presence for debugging
+    console.log('Using API key in CrawlerInterface (masked):', '****' + cleanApiKey.substring(cleanApiKey.length - 4));
     
     // Dispatch the start crawl action
     dispatch(startCrawl({
       projectId,
-      urls: validUrls
+      urls: validUrls,
+      api_key: cleanApiKey
     }));
+    
+    console.log('Crawl started with API key (masked):', '****' + cleanApiKey.substring(cleanApiKey.length - 4));
   };
 
   // Cancel crawling
@@ -214,14 +239,14 @@ const CrawlerInterface = ({ projectId }) => {
         </CardContent>
       </Card>
       
-      {activeJob && (
+      {activeJob && activeJob.id && (
         <Card sx={{ mb: 4 }}>
           <CardContent>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6">
                 Active Crawl Job
               </Typography>
-              {(activeJob.status === 'pending' || activeJob.status === 'running') && (
+              {activeJob.status && (activeJob.status === 'pending' || activeJob.status === 'running') && (
                 <Button
                   startIcon={<CancelIcon />}
                   color="warning"
@@ -235,17 +260,17 @@ const CrawlerInterface = ({ projectId }) => {
             <Grid container spacing={2} sx={{ mb: 2 }}>
               <Grid item xs={12} sm={6}>
                 <Typography variant="body2" color="text.secondary">
-                  Status: {renderStatusChip(activeJob.status)}
+                  Status: {activeJob.status ? renderStatusChip(activeJob.status) : 'Unknown'}
                 </Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography variant="body2" color="text.secondary">
-                  Started: {new Date(activeJob.startTime).toLocaleString()}
+                  Started: {activeJob.startTime ? new Date(activeJob.startTime).toLocaleString() : 'Unknown'}
                 </Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography variant="body2" color="text.secondary">
-                  Job ID: {activeJob.id}
+                  Job ID: {activeJob.id || 'Unknown'}
                 </Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -255,7 +280,7 @@ const CrawlerInterface = ({ projectId }) => {
               </Grid>
             </Grid>
             
-            {(activeJob.status === 'pending' || activeJob.status === 'running') && (
+            {activeJob.status && (activeJob.status === 'pending' || activeJob.status === 'running') && (
               <Box sx={{ width: '100%', mb: 2 }}>
                 <Typography variant="body2" color="text.secondary">
                   Progress: {activeJob.progress || 0}%
@@ -271,7 +296,7 @@ const CrawlerInterface = ({ projectId }) => {
         </Card>
       )}
       
-      {selectedJob && selectedJob.id !== activeJob?.id && (
+      {selectedJob && selectedJob.id && (!activeJob || selectedJob.id !== activeJob.id) && (
         <Card sx={{ mb: 4 }}>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -281,17 +306,17 @@ const CrawlerInterface = ({ projectId }) => {
             <Grid container spacing={2} sx={{ mb: 2 }}>
               <Grid item xs={12} sm={6}>
                 <Typography variant="body2" color="text.secondary">
-                  Status: {renderStatusChip(selectedJob.status)}
+                  Status: {selectedJob.status ? renderStatusChip(selectedJob.status) : 'Unknown'}
                 </Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography variant="body2" color="text.secondary">
-                  Started: {new Date(selectedJob.startTime).toLocaleString()}
+                  Started: {selectedJob.startTime ? new Date(selectedJob.startTime).toLocaleString() : 'Unknown'}
                 </Typography>
               </Grid>
               <Grid item xs={12} sm={6}>
                 <Typography variant="body2" color="text.secondary">
-                  Job ID: {selectedJob.id}
+                  Job ID: {selectedJob.id || 'Unknown'}
                 </Typography>
               </Grid>
               <Grid item xs={12} sm={6}>

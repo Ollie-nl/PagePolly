@@ -14,9 +14,16 @@ class ScrapingBeeService {
   /**
    * Get both encoded and decoded test URLs
    */
-  getTestUrls(targetUrl, apiKey = SCRAPINGBEE_CONFIG.API_KEY) {
+  getTestUrls(targetUrl, apiKey) {
     // Create parameters exactly matching the working URL
     const params = new URLSearchParams();
+    
+    // Ensure API key is actually defined
+    if (!apiKey) {
+      console.error('API key is undefined in getTestUrls');
+      throw new Error('API key is missing. Please configure it in Settings.');
+    }
+    
     params.append('api_key', apiKey);
     params.append('url', targetUrl);
     params.append('render_js', 'false');
@@ -50,14 +57,23 @@ class ScrapingBeeService {
   /**
    * Get the remaining credit balance
    */
-  async getCreditBalance(apiKey = SCRAPINGBEE_CONFIG.API_KEY) {
+  async getCreditBalance(apiKey) {
     this.cancelRequests();
     this.abortController = new AbortController();
 
     try {
-      console.log('Checking credit balance with API key:', apiKey);
+      // Ensure API key is actually defined
+      if (!apiKey) {
+        console.error('API key is undefined in getCreditBalance');
+        throw new Error('API key is missing. Please configure it in Settings.');
+      }
       
-      const accountUrl = `${this.baseUrl}/account?api_key=${apiKey}`;
+      // Clean the API key - remove any whitespace
+      const cleanApiKey = apiKey.trim();
+      
+      console.log('Checking credit balance with API key:', cleanApiKey ? '****' + cleanApiKey.substring(cleanApiKey.length - 4) : 'MISSING');
+      
+      const accountUrl = `${this.baseUrl}/account?api_key=${cleanApiKey}`;
       console.log('Account URL:', accountUrl);
       
       const response = await this.axiosInstance({
@@ -65,19 +81,17 @@ class ScrapingBeeService {
         url: accountUrl,
         signal: this.abortController.signal,
         validateStatus: status => true,
-        responseType: 'arraybuffer'
+        responseType: 'text'
       });
       
       console.log('Account API response status:', response.status);
       
       if (response.status !== 200) {
-        const responseText = Buffer.from(response.data).toString('utf8');
-        console.error('Error response from account API:', responseText);
+        console.error('Error response from account API:', response.data);
         throw new Error(`Account API returned status: ${response.status}`);
       }
       
-      const responseText = Buffer.from(response.data).toString('utf8');
-      const responseData = JSON.parse(responseText);
+      const responseData = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
       
       return {
         success: true,
@@ -105,16 +119,45 @@ class ScrapingBeeService {
   }
 
   /**
+   * Safely decode text from response
+   */
+  safeDecodeText(data) {
+    if (typeof data === 'string') {
+      return data;
+    }
+    
+    try {
+      // For browsers, use TextDecoder
+      if (typeof TextDecoder !== 'undefined') {
+        return new TextDecoder('utf-8').decode(new Uint8Array(data));
+      }
+      return String(data);
+    } catch (error) {
+      console.error('Error decoding text:', error);
+      return '';
+    }
+  }
+
+  /**
    * Scrape a target URL
    */
-  async scrape(url, apiKey = SCRAPINGBEE_CONFIG.API_KEY) {
+  async scrape(url, apiKey) {
     this.cancelRequests();
     this.abortController = new AbortController();
 
     try {
+      // Ensure API key is actually defined
+      if (!apiKey) {
+        console.error('API key is undefined in scrape method');
+        throw new Error('API key is missing. Please configure it in Settings.');
+      }
+      
+      // Clean the API key - remove any whitespace
+      const cleanApiKey = apiKey.trim();
+      
       // Directly create the URL exactly like the working example with ALL parameters
       const encodedUrl = encodeURIComponent(url);
-      const apiUrl = `${this.baseUrl}?api_key=${apiKey}&url=${encodedUrl}&render_js=false&json_response=true&return_page_source=true`;
+      const apiUrl = `${this.baseUrl}?api_key=${cleanApiKey}&url=${encodedUrl}&render_js=false&json_response=true&return_page_source=true`;
       
       console.log('----------------------------------');
       console.log('EXACT API CALL:');
@@ -129,7 +172,7 @@ class ScrapingBeeService {
         url: apiUrl,
         signal: this.abortController.signal,
         validateStatus: status => true, // Accept any status to get error details
-        responseType: 'arraybuffer' // Handle binary responses
+        responseType: 'text' // Use text instead of arraybuffer
       });
 
       console.log('Response status:', response.status);
@@ -137,29 +180,25 @@ class ScrapingBeeService {
       
       // Handle non-200 responses
       if (response.status !== 200) {
-        const responseText = response.data ? Buffer.from(response.data).toString('utf8') : '';
-        console.error('Error response body:', responseText);
-        throw new Error(`ScrapingBee API returned status: ${response.status}, Body: ${responseText}`);
+        console.error('Error response body:', response.data);
+        throw new Error(`ScrapingBee API returned status: ${response.status}, Body: ${response.data}`);
       }
 
-      // Convert binary response to text
-      const responseText = Buffer.from(response.data).toString('utf8');
-      
       // Try to parse as JSON if possible
       let parsedData;
       try {
-        parsedData = JSON.parse(responseText);
+        parsedData = JSON.parse(response.data);
       } catch (e) {
         // Not JSON, use as HTML/text
         parsedData = null;
       }
       
-      const finalData = parsedData || responseText;
+      const finalData = parsedData || response.data;
       
       return {
         success: true,
         data: finalData,
-        pageSource: responseText,
+        pageSource: response.data,
         credits: response.headers['x-credit-used'] || 1,
         message: 'Successfully scraped URL'
       };
@@ -178,9 +217,7 @@ class ScrapingBeeService {
       console.error('Scraping error details:', error);
       let errorMessage = 'Failed to scrape URL';
       if (error.response) {
-        const responseText = error.response.data ? Buffer.from(error.response.data).toString('utf8') : '';
-        console.error('Error response body:', responseText);
-        errorMessage = `Server returned ${error.response.status}: ${responseText}`;
+        errorMessage = `Server returned ${error.response.status}: ${error.response.data}`;
       } else if (error.request) {
         errorMessage = 'No response received from ScrapingBee API';
       }
@@ -201,16 +238,29 @@ class ScrapingBeeService {
   /**
    * Test the API connection
    */
-  async testConnection(apiKey = SCRAPINGBEE_CONFIG.API_KEY) {
+  async testConnection(apiKey) {
     try {
-      console.log('Starting API connection test...');
+      // Ensure API key is actually defined
+      if (!apiKey) {
+        console.error('API key is undefined in testConnection method');
+        throw new Error('API key is missing. Please configure it in Settings.');
+      }
+      
+      // Clean the API key - remove any whitespace
+      const cleanApiKey = apiKey.trim();
+      
+      if (!cleanApiKey) {
+        throw new Error('API key cannot be empty');
+      }
+      
+      console.log('Starting API connection test with key (masked):', '****' + cleanApiKey.substring(cleanApiKey.length - 4));
       
       // Test with the same URL that works in the curl command
       const testUrl = 'https://ferrum.audio';
       console.log(`Testing with URL: ${testUrl}`);
       
       // Skip the credit balance check to simplify troubleshooting
-      const testResult = await this.scrape(testUrl, apiKey);
+      const testResult = await this.scrape(testUrl, cleanApiKey);
       
       if (!testResult.success) {
         console.error('Test failed with error:', testResult.message);

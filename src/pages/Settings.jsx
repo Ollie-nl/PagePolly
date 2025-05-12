@@ -101,13 +101,19 @@ function Settings() {
   const handleSaveCrawler = async (e) => {
     e.preventDefault();
     
+    // Clean the API key by removing any whitespace
+    const cleanApiKey = formData.apiKey.trim();
+    
     const crawlerData = {
-      ...formData
+      ...formData,
+      apiKey: cleanApiKey // Use the cleaned API key
     };
     
     if (selectedCrawler) {
       crawlerData.id = selectedCrawler.id;
     }
+    
+    console.log('Saving API key (masked):', cleanApiKey ? '****' + cleanApiKey.substring(cleanApiKey.length - 4) : 'MISSING');
     
     const resultAction = await dispatch(saveCrawlerConfig(crawlerData));
     if (!resultAction.error) {
@@ -373,9 +379,7 @@ function Settings() {
                   </label>
                   
                   {/* Encoded URL */}
-                  <div className="space
-
--y-2">
+                  <div className="space-y-2">
                     <div className="text-xs font-medium text-gray-500">Encoded URL:</div>
                     <div className="relative">
                       <div className="bg-gray-50 rounded-md p-3 text-sm text-gray-600 break-all font-mono">

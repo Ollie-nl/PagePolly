@@ -51,45 +51,69 @@ function Table({
                 </div>
               </td>
             </tr>
-          ) : data.length === 0 ? (
+          ) : !Array.isArray(data) || data.length === 0 ? (
             <tr>
               <td colSpan={columns.length} className="px-6 py-8 text-center text-gray-500">
                 {emptyMessage}
               </td>
             </tr>
           ) : (
-            data.map((row, rowIdx) => (
-              <tr 
-                key={row.id || rowIdx} 
-                className={rowClass}
-                onClick={onRowClick ? () => onRowClick(row) : undefined}
-              >
-                {columns.map((column, colIdx) => (
-                  <td key={`${rowIdx}-${colIdx}`} className="px-6 py-4 whitespace-nowrap text-sm">
-                    {column.render ? column.render(row) : row[column.key]}
-                  </td>
-                ))}
-              </tr>
-            ))
+            data.map((row, rowIdx) => {
+              if (!row || typeof row !== 'object') return null;
+              return (
+                <tr 
+                  key={row.id || rowIdx} 
+                  className={rowClass}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                >
+                  {columns.map((column, colIdx) => {
+                    // Safe rendering of cell content
+                    let cellContent;
+                    try {
+                      if (column.render) {
+                        cellContent = column.render(row);
+                      } else if (column.key && row[column.key] !== undefined) {
+                        cellContent = row[column.key];
+                      } else {
+                        cellContent = '';
+                      }
+                    } catch (error) {
+                      console.error('Error rendering table cell:', error);
+                      cellContent = 'Error';
+                    }
+                    
+                    return (
+                      <td key={`${rowIdx}-${colIdx}`} className="px-6 py-4 whitespace-nowrap text-sm">
+                        {cellContent}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })
           )}
         </tbody>
       </table>
 
-      {pagination && (
+      {pagination && typeof pagination === 'object' && (
         <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-gray-700">
-                Showing <span className="font-medium">{pagination.startItem}</span> to{' '}
-                <span className="font-medium">{pagination.endItem}</span> of{' '}
-                <span className="font-medium">{pagination.totalItems}</span> results
+                Showing <span className="font-medium">{pagination.startItem || 0}</span> to{' '}
+                <span className="font-medium">{pagination.endItem || 0}</span> of{' '}
+                <span className="font-medium">{pagination.totalItems || 0}</span> results
               </p>
             </div>
             <div>
               <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                 <button
-                  onClick={() => pagination.onPageChange(pagination.currentPage - 1)}
-                  disabled={pagination.currentPage === 1}
+                  onClick={() => {
+                    if (typeof pagination.onPageChange === 'function') {
+                      pagination.onPageChange(Math.max(1, (pagination.currentPage || 1) - 1));
+                    }
+                  }}
+                  disabled={!pagination.currentPage || pagination.currentPage <= 1}
                   className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
                 >
                   <span className="sr-only">Previous</span>
@@ -98,23 +122,33 @@ function Table({
                   </svg>
                 </button>
                 
-                {[...Array(pagination.totalPages).keys()].map((page) => (
-                  <button
-                    key={page + 1}
-                    onClick={() => pagination.onPageChange(page + 1)}
-                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                      page + 1 === pagination.currentPage
-                        ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                        : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                    }`}
-                  >
-                    {page + 1}
-                  </button>
-                ))}
+                {Array.isArray(Array(pagination.totalPages || 0).fill()) && 
+                  [...Array(Math.max(0, pagination.totalPages || 0)).keys()].map((page) => (
+                    <button
+                      key={page + 1}
+                      onClick={() => {
+                        if (typeof pagination.onPageChange === 'function') {
+                          pagination.onPageChange(page + 1);
+                        }
+                      }}
+                      className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                        page + 1 === (pagination.currentPage || 1)
+                          ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                          : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                      }`}
+                    >
+                      {page + 1}
+                    </button>
+                  ))
+                }
                 
                 <button
-                  onClick={() => pagination.onPageChange(pagination.currentPage + 1)}
-                  disabled={pagination.currentPage === pagination.totalPages}
+                  onClick={() => {
+                    if (typeof pagination.onPageChange === 'function') {
+                      pagination.onPageChange(Math.min((pagination.totalPages || 1), (pagination.currentPage || 1) + 1));
+                    }
+                  }}
+                  disabled={!pagination.currentPage || !pagination.totalPages || pagination.currentPage >= pagination.totalPages}
                   className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
                 >
                   <span className="sr-only">Next</span>
