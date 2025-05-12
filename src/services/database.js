@@ -1,11 +1,11 @@
 // src/services/database.js
-import { supabase } from '../lib/supabaseClient';
+import supabaseClient from '../lib/supabaseClient';
 
 export class DatabaseService {
   // Projects
   static async createProject({ name, description }) {
     try {
-      const { data: project, error } = await supabase
+      const { data: project, error } = await supabaseClient
         .from('projects')
         .insert([{ name, description }])
         .select()
@@ -21,7 +21,7 @@ export class DatabaseService {
 
   static async getProjects() {
     try {
-      const { data: projects, error } = await supabase
+      const { data: projects, error } = await supabaseClient
         .from('projects')
         .select('*')
         .order('created_at', { ascending: false });
@@ -36,7 +36,7 @@ export class DatabaseService {
 
   static async getProject(id) {
     try {
-      const { data: project, error } = await supabase
+      const { data: project, error } = await supabaseClient
         .from('projects')
         .select('*')
         .eq('id', id)
@@ -52,7 +52,7 @@ export class DatabaseService {
 
   static async updateProject(id, updates) {
     try {
-      const { data: project, error } = await supabase
+      const { data: project, error } = await supabaseClient
         .from('projects')
         .update(updates)
         .eq('id', id)
@@ -69,7 +69,7 @@ export class DatabaseService {
 
   static async deleteProject(id) {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from('projects')
         .delete()
         .eq('id', id);
@@ -85,7 +85,7 @@ export class DatabaseService {
   // Pages
   static async createPage({ projectId, title }) {
     try {
-      const { data: page, error } = await supabase
+      const { data: page, error } = await supabaseClient
         .from('pages')
         .insert([{ project_id: projectId, title }])
         .select()
@@ -101,7 +101,7 @@ export class DatabaseService {
 
   static async getPages(projectId) {
     try {
-      const { data: pages, error } = await supabase
+      const { data: pages, error } = await supabaseClient
         .from('pages')
         .select('*')
         .eq('project_id', projectId)
@@ -117,7 +117,7 @@ export class DatabaseService {
 
   static async updatePage(id, updates) {
     try {
-      const { data: page, error } = await supabase
+      const { data: page, error } = await supabaseClient
         .from('pages')
         .update(updates)
         .eq('id', id)
@@ -134,7 +134,7 @@ export class DatabaseService {
 
   static async deletePage(id) {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from('pages')
         .delete()
         .eq('id', id);
@@ -149,7 +149,7 @@ export class DatabaseService {
 
   static async updatePageOrder(pageId, newOrder) {
     try {
-      const { data: page, error } = await supabase
+      const { data: page, error } = await supabaseClient
         .from('pages')
         .update({ order: newOrder })
         .eq('id', pageId)
@@ -167,7 +167,7 @@ export class DatabaseService {
   // Elements
   static async createElement({ pageId, type, content }) {
     try {
-      const { data: element, error } = await supabase
+      const { data: element, error } = await supabaseClient
         .from('elements')
         .insert([{ page_id: pageId, type, content }])
         .select()
@@ -183,7 +183,7 @@ export class DatabaseService {
 
   static async getElements(pageId) {
     try {
-      const { data: elements, error } = await supabase
+      const { data: elements, error } = await supabaseClient
         .from('elements')
         .select('*')
         .eq('page_id', pageId)
@@ -199,7 +199,7 @@ export class DatabaseService {
 
   static async updateElement(id, updates) {
     try {
-      const { data: element, error } = await supabase
+      const { data: element, error } = await supabaseClient
         .from('elements')
         .update(updates)
         .eq('id', id)
@@ -216,7 +216,7 @@ export class DatabaseService {
 
   static async deleteElement(id) {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseClient
         .from('elements')
         .delete()
         .eq('id', id);
@@ -231,7 +231,7 @@ export class DatabaseService {
 
   static async updateElementOrder(elementId, newOrder) {
     try {
-      const { data: element, error } = await supabase
+      const { data: element, error } = await supabaseClient
         .from('elements')
         .update({ order: newOrder })
         .eq('id', elementId)
@@ -242,6 +242,78 @@ export class DatabaseService {
       return element;
     } catch (error) {
       console.error('Error updating element order:', error);
+      throw error;
+    }
+  }
+
+  // Vendors
+  static async createVendor({ name, url, description }) {
+    try {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      if (!user?.email) throw new Error('User not authenticated');
+
+      const { data: vendor, error } = await supabaseClient
+        .from('pagepolly_el57ad_vendors')
+        .insert([{ 
+          name, 
+          url, 
+          description,
+          user_email: user.email
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return vendor;
+    } catch (error) {
+      console.error('Error creating vendor:', error);
+      throw error;
+    }
+  }
+
+  static async getVendors() {
+    try {
+      const { data: vendors, error } = await supabaseClient
+        .from('pagepolly_el57ad_vendors')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return vendors;
+    } catch (error) {
+      console.error('Error fetching vendors:', error);
+      throw error;
+    }
+  }
+
+  static async updateVendor(id, updates) {
+    try {
+      const { data: vendor, error } = await supabaseClient
+        .from('pagepolly_el57ad_vendors')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return vendor;
+    } catch (error) {
+      console.error('Error updating vendor:', error);
+      throw error;
+    }
+  }
+
+  static async deleteVendor(id) {
+    try {
+      const { error } = await supabaseClient
+        .from('pagepolly_el57ad_vendors')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (error) {
+      console.error('Error deleting vendor:', error);
       throw error;
     }
   }

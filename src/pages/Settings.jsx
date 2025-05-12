@@ -1,19 +1,27 @@
+// src/pages/Settings.jsx
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { 
   fetchCrawlerConfigs, 
   saveCrawlerConfig, 
-  deleteCrawlerConfig 
+  deleteCrawlerConfig,
+  testCrawlerConfig,
+  setActiveConfig,
+  clearTestStatus
 } from '../store/reducers/settingSlice';
+import Modal from '../components/common/Modal';
+import scrapingBeeService from '../services/scrapingBeeService';
+import LoadingSpinner, { ButtonSpinner } from '../components/LoadingSpinner';
 
 function Settings() {
   const dispatch = useDispatch();
-  const { crawlers, status, error } = useSelector((state) => state.settings);
+  const { crawlers, activeConfig, status, testStatus } = useSelector((state) => state.settings);
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedCrawler, setSelectedCrawler] = useState(null);
+  const [testUrls, setTestUrls] = useState({ encoded: '', decoded: '' });
   const [formData, setFormData] = useState({
     name: '',
     type: 'scrapingbee',
@@ -21,6 +29,14 @@ function Settings() {
     apiEndpoint: '',
     options: {}
   });
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      scrapingBeeService.cancelRequests();
+      dispatch(clearTestStatus());
+    };
+  }, [dispatch]);
 
   useEffect(() => {
     dispatch(fetchCrawlerConfigs());
@@ -31,9 +47,10 @@ function Settings() {
       name: '',
       type: 'scrapingbee',
       apiKey: '',
-      apiEndpoint: '',
+      apiEndpoint: 'https://app.scrapingbee.com/api/v1',
       options: {}
     });
+    setTestUrls({ encoded: '', decoded: '' });
     setIsAddModalOpen(true);
   };
 
@@ -42,11 +59,22 @@ function Settings() {
     setFormData({
       name: crawler.name,
       type: crawler.type,
-      apiKey: crawler.apiKey,
-      apiEndpoint: crawler.apiEndpoint,
+      apiKey: crawler.api_key,
+      apiEndpoint: crawler.api_endpoint,
       options: crawler.options || {}
     });
+    setTestUrls({ encoded: '', decoded: '' });
     setIsEditModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    scrapingBeeService.cancelRequests();
+    dispatch(clearTestStatus());
+    if (isAddModalOpen) {
+      setIsAddModalOpen(false);
+    } else if (isEditModalOpen) {
+      setIsEditModalOpen(false);
+    }
   };
 
   const handleOpenDeleteModal = (crawler) => {
@@ -59,7 +87,18 @@ function Settings() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSaveCrawler = (e) => {
+  const handleTestConnection = async () => {
+    const testEndpoint = 'http://httpbin.org/anything?json';
+    const { encodedUrl, decodedUrl } = scrapingBeeService.getTestUrls(testEndpoint, formData.apiKey);
+    setTestUrls({
+      encoded: encodedUrl,
+      decoded: decodedUrl
+    });
+    
+    await dispatch(testCrawlerConfig(formData));
+  };
+
+  const handleSaveCrawler = async (e) => {
     e.preventDefault();
     
     const crawlerData = {
@@ -70,55 +109,70 @@ function Settings() {
       crawlerData.id = selectedCrawler.id;
     }
     
-    dispatch(saveCrawlerConfig(crawlerData))
-      .unwrap()
-      .then(() => {
-        setIsAddModalOpen(false);
-        setIsEditModalOpen(false);
-      })
-      .catch(err => console.error('Failed to save crawler:', err));
+    const resultAction = await dispatch(saveCrawlerConfig(crawlerData));
+    if (!resultAction.error) {
+      handleCloseModal();
+    }
   };
 
-  const handleDeleteCrawler = () => {
+  const handleDeleteCrawler = async () => {
     if (!selectedCrawler) return;
 
-    dispatch(deleteCrawlerConfig(selectedCrawler.id))
-      .unwrap()
-      .then(() => {
-        setIsDeleteModalOpen(false);
-      })
-      .catch(err => console.error('Failed to delete crawler:', err));
+    const resultAction = await dispatch(deleteCrawlerConfig(selectedCrawler.id));
+    if (!resultAction.error) {
+      setIsDeleteModalOpen(false);
+    }
   };
 
-  // Modal component
-  const Modal = ({ isOpen, onClose, title, children }) => {
-    if (!isOpen) return null;
+  const handleSetActive = (crawler) => {
+    dispatch(setActiveConfig(crawler));
+  };
 
+  const handleCopyUrl = async (url) => {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch (err) {
+      console.error('Failed to copy URL:', err);
+    }
+  };
+
+  const inputStyles = `mt-1 block w-full rounded-md border-gray-300 shadow-sm 
+    focus:border-blue-500 focus:ring-blue-500 sm:text-base py-2 px-3
+    bg-white text-gray-900 placeholder-gray-400
+    hover:border-blue-400 transition duration-150 ease-in-out`;
+
+  if (status === 'loading' && crawlers.length === 0) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-6 w-full max-w-lg">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">{title}</h2>
-            <button 
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-          {children}
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <LoadingSpinner size="lg" />
       </div>
     );
-  };
+  }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
+      {/* Active Configuration Display */}
+      <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <h2 className="text-lg font-medium mb-4">Active Crawler Configuration</h2>
+        {activeConfig ? (
+          <div className="space-y-2">
+            <div className="flex items-center">
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                Active
+              </span>
+              <h3 className="ml-2 text-lg font-medium">{activeConfig.name}</h3>
+            </div>
+            <p className="text-sm text-gray-500">Type: {activeConfig.type}</p>
+            <p className="text-sm text-gray-500">Endpoint: {activeConfig.api_endpoint}</p>
+          </div>
+        ) : (
+          <p className="text-gray-500">No active crawler configuration</p>
+        )}
+      </div>
+
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Crawler Settings</h1>
           <p className="text-gray-500">Configure crawler APIs and application settings</p>
         </div>
         <button 
@@ -132,26 +186,19 @@ function Settings() {
         </button>
       </div>
 
-      {/* Crawler Configurations */}
+      {/* Crawler Configurations List */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="p-6 border-b border-gray-200">
           <h2 className="text-lg font-medium">Crawler Configurations</h2>
           <p className="mt-1 text-sm text-gray-500">
-            Configure the crawler APIs used to fetch data from vendor websites
+            Manage your crawler API configurations
           </p>
         </div>
 
-        {status === 'loading' && <div className="p-4 text-center">Loading configurations...</div>}
-        
-        {status === 'failed' && (
+        {status === 'loading' && (
           <div className="p-4 text-center">
-            <p className="text-red-500">{error || 'Failed to load configurations'}</p>
-            <button 
-              className="mt-2 text-blue-600 hover:text-blue-800"
-              onClick={() => dispatch(fetchCrawlerConfigs())}
-            >
-              Try again
-            </button>
+            <LoadingSpinner />
+            <p className="mt-2 text-gray-600">Loading configurations...</p>
           </div>
         )}
         
@@ -177,6 +224,9 @@ function Settings() {
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Name
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -194,6 +244,20 @@ function Settings() {
                 {crawlers.map(crawler => (
                   <tr key={crawler.id}>
                     <td className="px-6 py-4 whitespace-nowrap">
+                      {activeConfig?.id === crawler.id ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Active
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleSetActive(crawler)}
+                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 hover:bg-gray-200"
+                        >
+                          Set Active
+                        </button>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{crawler.name}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -202,7 +266,7 @@ function Settings() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 truncate max-w-xs">
-                      {crawler.apiEndpoint}
+                      {crawler.api_endpoint}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
                       <button 
@@ -226,227 +290,181 @@ function Settings() {
         )}
       </div>
 
-      {/* API Documentation Section */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-medium">API Documentation</h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Reference guide for integrating with various crawler APIs
-          </p>
-        </div>
-        
-        <div className="p-6 space-y-4">
-          <div className="border-l-4 border-blue-500 pl-4 py-2">
-            <h3 className="text-lg font-medium">ScrapingBee</h3>
-            <p className="text-sm text-gray-600 mt-1">
-              ScrapingBee provides a simple API to access web pages using browsers and proxies.
-            </p>
-            <a 
-              href="https://www.scrapingbee.com/documentation/" 
-              target="_blank" 
-              rel="noreferrer"
-              className="text-blue-600 hover:text-blue-800 text-sm mt-2 inline-block"
-            >
-              View Documentation →
-            </a>
+      {/* Add/Edit Modal Form */}
+      <Modal 
+        isOpen={isAddModalOpen || isEditModalOpen} 
+        onClose={handleCloseModal}
+        title={`${isAddModalOpen ? 'Add' : 'Edit'} Crawler Configuration`}
+      >
+        <form onSubmit={handleSaveCrawler} className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700" htmlFor="name">
+                Name
+              </label>
+              <input
+                type="text"
+                id="name"
+                name="name"
+                value={formData.name}
+                onChange={handleInputChange}
+                className={inputStyles}
+                required
+                placeholder="Enter crawler name"
+                disabled={status === 'loading'}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700" htmlFor="type">
+                Crawler Type
+              </label>
+              <select
+                id="type"
+                name="type"
+                value={formData.type}
+                onChange={handleInputChange}
+                className={inputStyles}
+                required
+                disabled={status === 'loading'}
+              >
+                <option value="scrapingbee">ScrapingBee</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700" htmlFor="apiKey">
+                API Key
+              </label>
+              <input
+                type="password"
+                id="apiKey"
+                name="apiKey"
+                value={formData.apiKey}
+                onChange={handleInputChange}
+                className={inputStyles}
+                required
+                placeholder="Enter API key"
+                disabled={status === 'loading'}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700" htmlFor="apiEndpoint">
+                API Endpoint
+              </label>
+              <input
+                type="text"
+                id="apiEndpoint"
+                name="apiEndpoint"
+                value={formData.apiEndpoint}
+                onChange={handleInputChange}
+                className={inputStyles}
+                placeholder="https://app.scrapingbee.com/api/v1"
+                required
+                disabled={status === 'loading'}
+              />
+            </div>
+            
+            {/* Test URLs Display */}
+            {(testUrls.encoded || testUrls.decoded) && (
+              <div className="space-y-4 mt-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Test Request URLs
+                  </label>
+                  
+                  {/* Encoded URL */}
+                  <div className="space
+
+-y-2">
+                    <div className="text-xs font-medium text-gray-500">Encoded URL:</div>
+                    <div className="relative">
+                      <div className="bg-gray-50 rounded-md p-3 text-sm text-gray-600 break-all font-mono">
+                        {testUrls.encoded}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyUrl(testUrls.encoded)}
+                        className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+                        title="Copy URL"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                          <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Decoded URL */}
+                  <div className="space-y-2 mt-4">
+                    <div className="text-xs font-medium text-gray-500">Decoded URL:</div>
+                    <div className="relative">
+                      <div className="bg-gray-50 rounded-md p-3 text-sm text-gray-600 break-all font-mono">
+                        {testUrls.decoded}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyUrl(testUrls.decoded)}
+                        className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+                        title="Copy URL"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <path d="M8 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z" />
+                          <path d="M6 3a2 2 0 00-2 2v11a2 2 0 002 2h8a2 2 0 002-2V5a2 2 0 00-2-2 3 3 0 01-3 3H9a3 3 0 01-3-3z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          
-          <div className="border-l-4 border-green-500 pl-4 py-2">
-            <h3 className="text-lg font-medium">Adding Custom Crawlers</h3>
-            <p className="text-sm text-gray-600 mt-1">
-              You can extend PagePolly with custom crawler implementations that conform to the ICrawler interface.
-            </p>
-            <div className="mt-2 bg-gray-50 p-3 rounded-md">
-              <code className="text-xs text-gray-800 font-mono">
-                <pre>{`interface ICrawler {
-  crawlUrl(url: string): Promise<CrawlResult>;
-  getStatus(): CrawlStatus;
-}`}</pre>
-              </code>
+
+          <div className="mt-6 flex justify-between items-center">
+            <button
+              type="button"
+              onClick={handleTestConnection}
+              disabled={testStatus === 'loading' || status === 'loading'}
+              className={`inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md 
+                ${testStatus === 'loading' || status === 'loading' ? 'bg-gray-100 text-gray-500' : 'text-gray-700 bg-white hover:bg-gray-50'} 
+                focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+            >
+              {testStatus === 'loading' ? (
+                <>
+                  <ButtonSpinner />
+                  Testing...
+                </>
+              ) : 'Test Connection'}
+            </button>
+            <div className="flex space-x-3">
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                disabled={status === 'loading'}
+                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={status === 'loading'}
+                className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white 
+                  ${status === 'loading' ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'} 
+                  focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+              >
+                {status === 'loading' ? (
+                  <>
+                    <ButtonSpinner />
+                    Saving...
+                  </>
+                ) : 'Save'}
+              </button>
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Add Crawler Modal */}
-      <Modal 
-        isOpen={isAddModalOpen} 
-        onClose={() => setIsAddModalOpen(false)} 
-        title="Add Crawler Configuration"
-      >
-        <form onSubmit={handleSaveCrawler}>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="name">
-              Name
-            </label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-              placeholder="Enter a name for this configuration"
-              required
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="type">
-              Crawler Type
-            </label>
-            <select
-              id="type"
-              name="type"
-              value={formData.type}
-              onChange={handleInputChange}
-              className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-              required
-            >
-              <option value="scrapingbee">ScrapingBee</option>
-              <option value="custom">Custom</option>
-            </select>
-          </div>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="apiKey">
-              API Key
-            </label>
-            <input
-              type="password"
-              id="apiKey"
-              name="apiKey"
-              value={formData.apiKey}
-              onChange={handleInputChange}
-              className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-              placeholder="Enter your API key"
-              required
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              API keys are stored securely with encryption
-            </p>
-          </div>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="apiEndpoint">
-              API Endpoint
-            </label>
-            <input
-              type="text"
-              id="apiEndpoint"
-              name="apiEndpoint"
-              value={formData.apiEndpoint}
-              onChange={handleInputChange}
-              className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-              placeholder="https://app.scrapingbee.com/api/v1"
-              required
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setIsAddModalOpen(false)}
-              className="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-            >
-              Save Configuration
-            </button>
-          </div>
         </form>
       </Modal>
 
-      {/* Edit Crawler Modal */}
-      <Modal 
-        isOpen={isEditModalOpen} 
-        onClose={() => setIsEditModalOpen(false)} 
-        title="Edit Crawler Configuration"
-      >
-        <form onSubmit={handleSaveCrawler}>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="edit-name">
-              Name
-            </label>
-            <input
-              type="text"
-              id="edit-name"
-              name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-              placeholder="Enter a name for this configuration"
-              required
-            />
-          </div>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="edit-type">
-              Crawler Type
-            </label>
-            <select
-              id="edit-type"
-              name="type"
-              value={formData.type}
-              onChange={handleInputChange}
-              className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-              required
-            >
-              <option value="scrapingbee">ScrapingBee</option>
-              <option value="custom">Custom</option>
-            </select>
-          </div>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="edit-apiKey">
-              API Key
-            </label>
-            <input
-              type="password"
-              id="edit-apiKey"
-              name="apiKey"
-              value={formData.apiKey}
-              onChange={handleInputChange}
-              className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-              placeholder="Enter your API key"
-              required
-            />
-            <p className="mt-1 text-xs text-gray-500">
-              Leave unchanged to keep the existing API key
-            </p>
-          </div>
-          <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-medium mb-2" htmlFor="edit-apiEndpoint">
-              API Endpoint
-            </label>
-            <input
-              type="text"
-              id="edit-apiEndpoint"
-              name="apiEndpoint"
-              value={formData.apiEndpoint}
-              onChange={handleInputChange}
-              className="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border-gray-300 rounded-md"
-              placeholder="https://app.scrapingbee.com/api/v1"
-              required
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => setIsEditModalOpen(false)}
-              className="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-            >
-              Update Configuration
-            </button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Delete Confirmation Modal */}
+      {/* Delete Modal */}
       <Modal 
         isOpen={isDeleteModalOpen} 
         onClose={() => setIsDeleteModalOpen(false)} 
@@ -457,21 +475,28 @@ function Settings() {
             Are you sure you want to delete the crawler configuration "{selectedCrawler?.name}"?
           </p>
           <p className="text-sm text-gray-500 mt-2">
-            If this is the only crawler configuration, you will need to add a new one before you can crawl vendor sites.
+            This action cannot be undone.
           </p>
         </div>
         <div className="flex justify-end gap-2">
           <button
             onClick={() => setIsDeleteModalOpen(false)}
+            disabled={status === 'loading'}
             className="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
             Cancel
           </button>
           <button
             onClick={handleDeleteCrawler}
+            disabled={status === 'loading'}
             className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
           >
-            Delete
+            {status === 'loading' ? (
+              <>
+                <ButtonSpinner />
+                Deleting...
+              </>
+            ) : 'Delete'}
           </button>
         </div>
       </Modal>

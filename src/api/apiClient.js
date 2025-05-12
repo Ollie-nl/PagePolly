@@ -1,21 +1,22 @@
 import axios from 'axios';
+import supabaseClient from '../lib/supabaseClient';
 
 // Create Axios instance with default config
 const apiClient = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_SUPABASE_URL,
   timeout: 30000, // 30 seconds timeout
   headers: {
     'Content-Type': 'application/json',
+    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
   }
 });
 
 // Request interceptor for adding auth token
 apiClient.interceptors.request.use(
   config => {
-    // When we implement authentication, we can add token here
-    const token = localStorage.getItem('auth_token');
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`;
+    const session = supabaseClient.auth.getSession();
+    if (session?.access_token) {
+      config.headers['Authorization'] = `Bearer ${session.access_token}`;
     }
     return config;
   },
@@ -32,36 +33,31 @@ apiClient.interceptors.response.use(
   error => {
     const { response } = error;
     
-    // Handle specific error codes
     if (response) {
+      // Extract error message from Supabase response
+      const errorMessage = response.data?.error?.message || response.data?.message || 'An error occurred';
+      
       switch (response.status) {
         case 401:
-          // Unauthorized - clear token and redirect to login (when implemented)
-          localStorage.removeItem('auth_token');
-          console.error('Session expired. Please log in again.');
+          console.error('Authentication error:', errorMessage);
           break;
           
         case 403:
-          // Forbidden
-          console.error('You do not have permission to perform this action');
+          console.error('Permission denied:', errorMessage);
           break;
           
         case 404:
-          // Not found
-          console.error('The requested resource was not found');
+          console.error('Resource not found:', errorMessage);
           break;
           
         case 500:
-          // Server error
-          console.error('Internal server error');
+          console.error('Server error:', errorMessage);
           break;
           
         default:
-          // Other errors
-          console.error('An error occurred', response.data);
+          console.error('API error:', errorMessage);
       }
     } else {
-      // Network error
       console.error('Network error. Please check your connection');
     }
     
@@ -100,11 +96,6 @@ const api = {
   
   delete: (url, config = {}) => {
     return apiClient.delete(url, config);
-  },
-  
-  // Configure API base URL (e.g., for different environments)
-  setBaseURL: (url) => {
-    apiClient.defaults.baseURL = url;
   }
 };
 

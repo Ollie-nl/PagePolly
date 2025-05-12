@@ -6,6 +6,7 @@ const dotenv = require('dotenv');
 const { createClient } = require('@supabase/supabase-js');
 const crawlRoutes = require('./routes/crawlRoutes');
 const authMiddleware = require('./middlewares/auth');
+const scrapingBeeProxy = require('./middlewares/scrapingBeeProxy');
 
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '../.env') });
@@ -31,6 +32,8 @@ if (process.env.NODE_ENV === 'production') {
 
 // API routes
 app.use('/api/crawls', authMiddleware, crawlRoutes);
+// Add ScrapingBee proxy route - no auth required for testing purposes
+app.use('/api/scrapingbee', scrapingBeeProxy);
 
 // Serve React app in production
 if (process.env.NODE_ENV === 'production') {

@@ -1,0 +1,58 @@
+classDiagram
+    class Vendor {
+        +UUID id
+        +String name
+        +String website_url
+        +String status
+        +DateTime created_at
+        +DateTime updated_at
+        +createVendor()
+        +updateVendor()
+        +startCrawl()
+    }
+
+    class CrawlJob {
+        +UUID id
+        +UUID vendor_id
+        +String status
+        +DateTime start_time
+        +DateTime end_time
+        +Integer total_pages
+        +Integer crawled_pages
+        +String error_message
+        +DateTime created_at
+        +DateTime updated_at
+        +create()
+        +updateStatus()
+        +updateProgress()
+        +complete()
+    }
+
+    class CrawledPage {
+        +UUID id
+        +UUID crawl_job_id
+        +String url
+        +String title
+        +JSON content
+        +JSON meta_data
+        +String status
+        +DateTime crawled_at
+        +DateTime created_at
+        +DateTime updated_at
+        +save()
+        +update()
+    }
+
+    class CrawlError {
+        +UUID id
+        +UUID crawl_job_id
+        +String page_url
+        +String error_type
+        +String error_message
+        +DateTime created_at
+        +logError()
+    }
+
+    Vendor "1" -- "*" CrawlJob : has
+    CrawlJob "1" -- "*" CrawledPage : contains
+    CrawlJob "1" -- "*" CrawlError : reports

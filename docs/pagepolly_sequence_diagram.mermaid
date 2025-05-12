@@ -1,0 +1,32 @@
+sequenceDiagram
+    actor User
+    participant UI
+    participant VendorService
+    participant CrawlService
+    participant DB
+
+    User->>UI: Select vendor to crawl
+    UI->>VendorService: startCrawl(vendorId)
+    VendorService->>DB: getVendor(vendorId)
+    DB-->>VendorService: vendor
+    
+    VendorService->>CrawlService: createCrawlJob(vendor)
+    CrawlService->>DB: insertCrawlJob()
+    DB-->>CrawlService: crawlJobId
+    
+    CrawlService->>CrawlService: initializeCrawler()
+    loop For each page
+        CrawlService->>CrawlService: crawlPage(url)
+        CrawlService->>DB: saveCrawledPage()
+        alt Success
+            DB-->>CrawlService: success
+            CrawlService->>DB: updateProgress()
+        else Error
+            CrawlService->>DB: logError()
+        end
+    end
+    
+    CrawlService->>DB: completeCrawlJob()
+    DB-->>CrawlService: success
+    CrawlService-->>UI: updateStatus()
+    UI-->>User: Show completion status

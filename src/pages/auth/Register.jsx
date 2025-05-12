@@ -1,37 +1,49 @@
 // src/pages/auth/Register.jsx
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { useAuth } from '../../hooks/useAuth'
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function Register() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
-  const [formError, setFormError] = useState('')
-  const { signUp, error } = useAuth()
-  const navigate = useNavigate()
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [formError, setFormError] = useState('');
+  const { register } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setFormError('')
+    e.preventDefault();
+    setFormError('');
 
+    // Password validation
     if (password !== confirmPassword) {
-      setFormError('Passwords do not match')
-      return
+      setFormError('Passwords do not match');
+      return;
     }
 
-    setIsLoading(true)
-
-    try {
-      await signUp(email, password)
-      navigate('/login', { state: { message: 'Please check your email to verify your account' } })
-    } catch (err) {
-      setFormError(err.message)
-    } finally {
-      setIsLoading(false)
+    if (password.length < 6) {
+      setFormError('Password must be at least 6 characters');
+      return;
     }
-  }
+
+    setIsLoading(true);
+
+    const { error } = await register(email, password);
+    
+    if (error) {
+      setFormError(error);
+      setIsLoading(false);
+      return;
+    }
+
+    // On successful registration, navigate to login
+    navigate('/login', { 
+      state: { 
+        message: 'Please check your email to confirm your account before logging in.' 
+      }
+    });
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -42,9 +54,9 @@ export default function Register() {
           </h2>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {(formError || error) && (
+          {formError && (
             <div className="bg-red-50 p-4 rounded-md">
-              <p className="text-red-600 text-sm">{formError || error}</p>
+              <p className="text-red-600 text-sm">{formError}</p>
             </div>
           )}
           <div className="rounded-md shadow-sm space-y-4">
@@ -75,10 +87,10 @@ export default function Register() {
               />
             </div>
             <div>
-              <label htmlFor="confirm-password" className="sr-only">Confirm Password</label>
+              <label htmlFor="confirmPassword" className="sr-only">Confirm Password</label>
               <input
-                id="confirm-password"
-                name="confirm-password"
+                id="confirmPassword"
+                name="confirmPassword"
                 type="password"
                 required
                 className="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
@@ -107,5 +119,5 @@ export default function Register() {
         </form>
       </div>
     </div>
-  )
+  );
 }

@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Provider } from 'react-redux';
+import { Toaster } from 'react-hot-toast';
 import store from './store';
 import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
@@ -16,9 +17,9 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 function App() {
   return (
     <Provider store={store}>
-      <AuthProvider>
         <Router>
-          <Routes>
+          <AuthProvider>
+            <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/" element={
@@ -33,9 +34,10 @@ function App() {
               <Route path="crawler/:projectId" element={<CrawlerPage />} />
               <Route path="*" element={<NotFound />} />
             </Route>
-          </Routes>
+            </Routes>
+          <Toaster position="top-right" />
+          </AuthProvider>
         </Router>
-      </AuthProvider>
     </Provider>
   );
 }

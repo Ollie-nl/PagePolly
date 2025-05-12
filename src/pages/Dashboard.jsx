@@ -5,8 +5,8 @@ import { getActiveCrawls, getCrawlHistory } from '../store/reducers/crawlSlice';
 
 function Dashboard() {
   const dispatch = useDispatch();
-  const { items: vendors } = useSelector((state) => state.vendors);
-  const { activeJob, history } = useSelector((state) => state.crawl);
+  const { items: vendors = [] } = useSelector((state) => state.vendors || {});
+  const { activeJob = null, history = [] } = useSelector((state) => state.crawls || {});
   const [stats, setStats] = useState({
     totalVendors: 0,
     crawledVendors: 0,

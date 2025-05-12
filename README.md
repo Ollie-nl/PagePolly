@@ -103,7 +103,7 @@ When you're ready to deploy the application, create a production build:
 ```bash
 node run build
 # or
-yarn build
+ yarn build
 # or
 pnpm run build
 ```
