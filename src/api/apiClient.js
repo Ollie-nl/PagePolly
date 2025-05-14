@@ -1,18 +1,20 @@
 import axios from 'axios';
 import supabaseClient from '../lib/supabaseClient';
 
+// Utility functions for retry logic
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const getRetryDelay = (retryCount) => Math.min(1000 * Math.pow(2, retryCount), 10000);
+
 // Create Axios instance with default config
 const apiClient = axios.create({
-  baseURL: '',  // Empty baseURL for relative URLs
-  timeout: 30000, // 30 seconds timeout
+  baseURL: import.meta.env.VITE_API_URL || '',
+  timeout: 60000, // Increased timeout to 60 seconds
   headers: {
     'Content-Type': 'application/json',
-    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-    // Add CORS headers
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+  },
+  validateStatus: function (status) {
+    return (status >= 200 && status < 300) || status === 503; // Allow 503 for retry logic
   }
 });
 
@@ -30,43 +32,55 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor for handling common errors
+// Response interceptor with retry logic
 apiClient.interceptors.response.use(
-  response => {
-    return response;
-  },
-  error => {
-    const { response } = error;
+  response => response,
+  async error => {
+    const { config, response } = error;
     
-    if (response) {
-      // Extract error message from Supabase response
-      const errorMessage = response.data?.error?.message || response.data?.message || 'An error occurred';
+    // Initialize retry count
+    config.retryCount = config.retryCount || 0;
+    
+    // Log the error details
+    console.error(`API Error [${config.url}] [Attempt ${config.retryCount + 1}]:`, {
+      status: response?.status,
+      data: response?.data,
+      error: error.message
+    });
+    
+    // Determine if we should retry
+    const shouldRetry = (
+      // Only retry on specific status codes
+      (response?.status === 503 || !response) &&
+      // Maximum 3 retries
+      config.retryCount < 3
+    );
+    
+    if (shouldRetry) {
+      config.retryCount += 1;
+      const delay = getRetryDelay(config.retryCount);
       
-      switch (response.status) {
-        case 401:
-          console.error('Authentication error:', errorMessage);
-          break;
-          
-        case 403:
-          console.error('Permission denied:', errorMessage);
-          break;
-          
-        case 404:
-          console.error('Resource not found:', errorMessage);
-          break;
-          
-        case 500:
-          console.error('Server error:', errorMessage);
-          break;
-          
-        default:
-          console.error('API error:', errorMessage);
-      }
-    } else {
-      console.error('Network error. Please check your connection');
+      console.log(`Retrying request [${config.url}] in ${delay}ms...`);
+      await wait(delay);
+      
+      // Make a new request with the same config
+      return apiClient(config);
     }
     
-    return Promise.reject(error);
+    // Extract error message
+    const errorMessage = 
+      response?.data?.error?.message ||
+      response?.data?.message ||
+      error.message ||
+      'An unexpected error occurred';
+    
+    // Enhance error object
+    const enhancedError = new Error(errorMessage);
+    enhancedError.status = response?.status;
+    enhancedError.data = response?.data;
+    enhancedError.config = config;
+    
+    return Promise.reject(enhancedError);
   }
 );
 

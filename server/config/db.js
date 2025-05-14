@@ -1,146 +1,224 @@
 // server/config/db.js
 const { createClient } = require('@supabase/supabase-js');
-const path = require('path');
 const dotenv = require('dotenv');
+const path = require('path');
 
-// Load environment variables
+// Load environment variables from .env file
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing Supabase credentials in environment variables');
+// Check for required environment variables
+if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+  console.error('Missing Supabase environment variables. Please check your .env file.');
+  process.exit(1);
 }
 
-// Initialize Supabase client with service role key for admin access
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Initialize Supabase client
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_ANON_KEY
+);
 
 /**
- * Database service for crawl operations
+ * Database interface for managing crawl jobs and results
  */
-class DBService {
+const db = {
   /**
-   * Create a new crawl job record
+   * Creates a new crawl job in the database
    * @param {Object} job - Job details
-   * @returns {Object} - Created job record
+   * @returns {Promise<Object>} - Created job
    */
   async createCrawlJob(job) {
+    const { id, userId, vendorId, urls, status, progress, settings } = job;
+    
+    // Ensure tables exist
+    await this.ensureTables();
+    
+    // Insert into crawl_jobs_ohxp1d table
     const { data, error } = await supabase
-      .from('crawl_jobs')
-      .insert([{
-        id: job.id,
-        project_id: job.projectId,
-        user_id: job.userId,
-        status: job.status,
-        progress: job.progress,
-        urls: job.urls,
-        start_time: job.startTime
-      }])
-      .select()
+      .from('crawl_jobs_ohxp1d')
+      .insert({
+        id,
+        user_email: userId,
+        vendor_id: vendorId,
+        urls,
+        status,
+        progress,
+        settings,
+        creation_time: new Date(),
+      })
+      .select('*')
       .single();
-
-    if (error) throw error;
+    
+    if (error) {
+      console.error('Error creating crawl job:', error);
+      throw new Error(`Failed to create crawl job: ${error.message}`);
+    }
+    
     return data;
-  }
-
+  },
+  
   /**
-   * Update an existing crawl job
-   * @param {string} jobId - ID of job to update
+   * Updates an existing crawl job
+   * @param {string} jobId - ID of the job to update
    * @param {Object} updates - Fields to update
-   * @returns {Object} - Updated job record
+   * @returns {Promise<Object>} - Updated job
    */
   async updateCrawlJob(jobId, updates) {
     const updateData = {};
     
-    // Map updates to database column names
+    // Map updates to database fields
     if (updates.status) updateData.status = updates.status;
-    if (updates.progress) updateData.progress = updates.progress;
-    if (updates.results) updateData.results = updates.results;
-    if (updates.completionTime) updateData.completion_time = updates.completionTime;
+    if (updates.progress !== undefined) updateData.progress = updates.progress;
     if (updates.error) updateData.error = updates.error;
+    if (updates.completionTime) updateData.completion_time = updates.completionTime;
     
+    // Update job in database
     const { data, error } = await supabase
-      .from('crawl_jobs')
+      .from('crawl_jobs_ohxp1d')
       .update(updateData)
       .eq('id', jobId)
-      .select()
+      .select('*')
       .single();
-
-    if (error) throw error;
+    
+    if (error) {
+      console.error('Error updating crawl job:', error);
+      throw new Error(`Failed to update crawl job: ${error.message}`);
+    }
+    
     return data;
-  }
-
+  },
+  
   /**
-   * Get a specific crawl job
-   * @param {string} jobId - ID of job to retrieve
-   * @returns {Object|null} - Job record or null if not found
+   * Gets details of a specific crawl job
+   * @param {string} jobId - ID of the job to retrieve
+   * @returns {Promise<Object>} - Job details
    */
   async getCrawlJob(jobId) {
-    const { data, error } = await supabase
-      .from('crawl_jobs')
+    // Get job data
+    const { data: job, error: jobError } = await supabase
+      .from('crawl_jobs_ohxp1d')
       .select('*')
       .eq('id', jobId)
       .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') return null; // Record not found
-      throw error;
+    
+    if (jobError) {
+      console.error('Error retrieving crawl job:', jobError);
+      throw new Error(`Failed to retrieve crawl job: ${jobError.message}`);
     }
     
-    return {
-      id: data.id,
-      projectId: data.project_id,
-      userId: data.user_id,
-      status: data.status,
-      progress: data.progress,
-      urls: data.urls,
-      startTime: data.start_time,
-      completionTime: data.completion_time,
-      results: data.results || [],
-      errors: data.errors || []
-    };
-  }
-
+    if (!job) {
+      return null;
+    }
+    
+    // Get job results if completed
+    if (job.status === 'completed' || job.status === 'partial') {
+      const { data: results, error: resultsError } = await supabase
+        .from('crawl_results_ohxp1d')
+        .select('*')
+        .eq('job_id', jobId);
+      
+      if (resultsError) {
+        console.error('Error retrieving crawl results:', resultsError);
+      } else {
+        job.results = results;
+      }
+      
+      // Get job errors
+      const { data: errors, error: errorsError } = await supabase
+        .from('crawl_errors_ohxp1d')
+        .select('*')
+        .eq('job_id', jobId);
+      
+      if (errorsError) {
+        console.error('Error retrieving crawl errors:', errorsError);
+      } else {
+        job.errors = errors;
+      }
+    }
+    
+    return this.formatJobData(job);
+  },
+  
+  /**
+   * Store a successful crawl result
+   * @param {Object} result - Crawl result data
+   * @returns {Promise<Object>} - Stored result
+   */
+  async storeCrawlResult(result) {
+    const { 
+      jobId, vendorId, url, status, data, 
+      screenshot, crawlDuration, retryCount, timestamp 
+    } = result;
+    
+    const { data: storedResult, error } = await supabase
+      .from('crawl_results_ohxp1d')
+      .insert({
+        job_id: jobId,
+        vendor_id: vendorId,
+        url,
+        status,
+        data,
+        screenshot,
+        crawl_duration: crawlDuration,
+        retry_count: retryCount,
+        timestamp
+      })
+      .select('*')
+      .single();
+    
+    if (error) {
+      console.error('Error storing crawl result:', error);
+      throw new Error(`Failed to store crawl result: ${error.message}`);
+    }
+    
+    return storedResult;
+  },
+  
   /**
    * Record a crawl error
-   * @param {string} jobId - Job ID
-   * @param {string} url - URL that caused the error
-   * @param {string} errorMessage - Error message
+   * @param {string} jobId - ID of the job
+   * @param {string} url - URL that failed
+   * @param {string} error - Error message
+   * @param {boolean} isBlocking - Whether it's a blocking error
+   * @returns {Promise<Object>} - Stored error
    */
-  async recordCrawlError(jobId, url, errorMessage) {
-    const { data, error } = await supabase
-      .from('crawl_jobs')
-      .select('errors')
-      .eq('id', jobId)
+  async recordCrawlError(jobId, url, error, isBlocking = false) {
+    const { data: storedError, error: dbError } = await supabase
+      .from('crawl_errors_ohxp1d')
+      .insert({
+        job_id: jobId,
+        url,
+        error,
+        is_blocking: isBlocking,
+        timestamp: new Date()
+      })
+      .select('*')
       .single();
-
-    if (error) throw error;
     
-    const errors = data.errors || [];
-    errors.push({ url, error: errorMessage, time: new Date() });
+    if (dbError) {
+      console.error('Error recording crawl error:', dbError);
+      throw new Error(`Failed to record crawl error: ${dbError.message}`);
+    }
     
-    await supabase
-      .from('crawl_jobs')
-      .update({ errors })
-      .eq('id', jobId);
-  }
-
+    return storedError;
+  },
+  
   /**
    * Get crawl history for a user
    * @param {string} userId - User ID
-   * @param {Object} filters - Filters to apply
-   * @returns {Array} - List of jobs
+   * @param {Object} filters - Filters and pagination options
+   * @returns {Promise<Array>} - Crawl history
    */
   async getCrawlHistory(userId, filters = {}) {
     let query = supabase
-      .from('crawl_jobs')
-      .select('id, project_id, status, progress, start_time, completion_time, urls, error')
-      .eq('user_id', userId);
+      .from('crawl_jobs_ohxp1d')
+      .select('*')
+      .eq('user_email', userId)
+      .order('creation_time', { ascending: false });
     
     // Apply filters
-    if (filters.projectId) {
-      query = query.eq('project_id', filters.projectId);
+    if (filters.vendorId) {
+      query = query.eq('vendor_id', filters.vendorId);
     }
     
     if (filters.status) {
@@ -148,103 +226,346 @@ class DBService {
     }
     
     // Apply pagination
-    const page = filters.page || 1;
-    const limit = filters.limit || 10;
-    const from = (page - 1) * limit;
-    const to = from + limit - 1;
+    if (filters.limit) {
+      query = query.limit(filters.limit);
+    }
     
-    query = query
-      .order('start_time', { ascending: false })
-      .range(from, to);
+    if (filters.offset !== undefined) {
+      query = query.range(filters.offset, filters.offset + (filters.limit || 10) - 1);
+    }
     
+    // Execute query
     const { data, error } = await query;
-
-    if (error) throw error;
     
-    // Map to camelCase for frontend
-    return data.map(job => ({
-      id: job.id,
-      projectId: job.project_id,
-      status: job.status,
-      progress: job.progress,
-      startTime: job.start_time,
-      completionTime: job.completion_time,
-      urlCount: job.urls?.length || 0,
-      error: job.error
-    }));
-  }
-
+    if (error) {
+      console.error('Error retrieving crawl history:', error);
+      throw new Error(`Failed to retrieve crawl history: ${error.message}`);
+    }
+    
+    // Format and return results
+    return data.map(job => this.formatJobData(job));
+  },
+  
   /**
-   * Initialize database with required tables
+   * Get vendor-specific configuration
+   * @param {string} vendorId - Vendor ID
+   * @returns {Promise<Object>} - Vendor configuration
    */
-  async initializeDatabase() {
-    // Check if crawl_jobs table exists, create if not
-    const { error: tableExistsError } = await supabase
-      .from('crawl_jobs')
-      .select('id')
-      .limit(1);
+  async getVendorConfig(vendorId) {
+    if (!vendorId) {
+      return null;
+    }
     
-    if (tableExistsError && tableExistsError.code === 'PGRST104') {
-      // Table does not exist, create it
-      const createTableSQL = `
-        CREATE TABLE IF NOT EXISTS crawl_jobs (
-          id UUID PRIMARY KEY,
-          project_id UUID REFERENCES projects(id) ON DELETE CASCADE NOT NULL,
-          user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-          status TEXT NOT NULL,
-          progress INTEGER DEFAULT 0,
-          urls TEXT[] NOT NULL,
-          results JSONB DEFAULT '[]',
-          errors JSONB DEFAULT '[]',
-          start_time TIMESTAMP WITH TIME ZONE NOT NULL,
-          completion_time TIMESTAMP WITH TIME ZONE,
-          error TEXT,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
-        );
-        
-        CREATE INDEX IF NOT EXISTS crawl_jobs_project_id_idx ON crawl_jobs(project_id);
-        CREATE INDEX IF NOT EXISTS crawl_jobs_user_id_idx ON crawl_jobs(user_id);
-        CREATE INDEX IF NOT EXISTS crawl_jobs_status_idx ON crawl_jobs(status);
-        
-        ALTER TABLE crawl_jobs ENABLE ROW LEVEL SECURITY;
-        
-        CREATE POLICY "Users can view their own crawl jobs"
-          ON crawl_jobs FOR SELECT
-          USING (auth.uid() = user_id);
-        
-        CREATE POLICY "Users can create crawl jobs for their projects"
-          ON crawl_jobs FOR INSERT
-          WITH CHECK (auth.uid() = user_id AND EXISTS (
-            SELECT 1 FROM projects
-            WHERE id = project_id AND user_id = auth.uid()
-          ));
-        
-        CREATE POLICY "Service role can update crawl jobs"
-          ON crawl_jobs FOR UPDATE
-          USING (auth.uid() = user_id OR auth.jwt() ? auth.jwt()->>'role' = 'service_role');
-          
-        CREATE POLICY "Users can delete their own crawl jobs"
-          ON crawl_jobs FOR DELETE
-          USING (auth.uid() = user_id);
-      `;
-
-      const { error } = await supabase.rpc('exec_sql', { sql: createTableSQL });
+    const { data, error } = await supabase
+      .from('vendor_configs_ohxp1d')
+      .select('*')
+      .eq('vendor_id', vendorId)
+      .single();
+    
+    if (error && error.code !== 'PGRST116') { // PGRST116 is "no rows returned"
+      console.error('Error retrieving vendor config:', error);
+      throw new Error(`Failed to retrieve vendor config: ${error.message}`);
+    }
+    
+    return data || null;
+  },
+  
+  /**
+   * Update vendor-specific configuration
+   * @param {string} vendorId - Vendor ID
+   * @param {Object} config - Configuration object
+   * @returns {Promise<Object>} - Updated configuration
+   */
+  async updateVendorConfig(vendorId, config) {
+    // Check if vendor config exists
+    const existing = await this.getVendorConfig(vendorId);
+    
+    if (existing) {
+      // Update existing config
+      const { data, error } = await supabase
+        .from('vendor_configs_ohxp1d')
+        .update({ config })
+        .eq('vendor_id', vendorId)
+        .select('*')
+        .single();
+      
       if (error) {
-        console.error("Failed to create crawl_jobs table:", error);
-        throw error;
+        console.error('Error updating vendor config:', error);
+        throw new Error(`Failed to update vendor config: ${error.message}`);
       }
       
-      console.log("Crawl jobs table created successfully");
+      return data;
+    } else {
+      // Create new config
+      const { data, error } = await supabase
+        .from('vendor_configs_ohxp1d')
+        .insert({
+          vendor_id: vendorId,
+          config,
+          created_at: new Date()
+        })
+        .select('*')
+        .single();
+      
+      if (error) {
+        console.error('Error creating vendor config:', error);
+        throw new Error(`Failed to create vendor config: ${error.message}`);
+      }
+      
+      return data;
     }
+  },
+  
+  /**
+   * Ensure all required tables exist in the database
+   * @returns {Promise<void>}
+   */
+  async ensureTables() {
+    try {
+      // Check if tables exist
+      const { data: existingTables, error } = await supabase
+        .from('information_schema.tables')
+        .select('table_name')
+        .eq('table_schema', 'public')
+        .in('table_name', ['crawl_jobs_ohxp1d', 'crawl_results_ohxp1d', 'crawl_errors_ohxp1d', 'vendor_configs_ohxp1d', 'test_crawls_ohxp1d']);
+      
+      if (error) {
+        console.error('Error checking tables:', error);
+        throw new Error(`Failed to check tables: ${error.message}`);
+      }
+      
+      const tables = existingTables.map(t => t.table_name);
+      
+      // Create missing tables if needed
+      if (!tables.includes('crawl_jobs_ohxp1d')) {
+        await this.createJobsTable();
+      }
+      
+      if (!tables.includes('crawl_results_ohxp1d')) {
+        await this.createResultsTable();
+      }
+      
+      if (!tables.includes('crawl_errors_ohxp1d')) {
+        await this.createErrorsTable();
+      }
+      
+      if (!tables.includes('vendor_configs_ohxp1d')) {
+        await this.createVendorConfigsTable();
+      }
+
+      if (!tables.includes('test_crawls_ohxp1d')) {
+        await supabase.rpc('create_test_crawls_table_ohxp1d');
+      }
+    } catch (error) {
+      console.error('Error ensuring tables exist:', error);
+      throw error;
+    }
+  },
+  
+  /**
+   * Create the crawl jobs table
+   * @returns {Promise<void>}
+   */
+  async createJobsTable() {
+    const { error } = await supabase.rpc('create_crawl_jobs_table_ohxp1d');
+    
+    if (error) {
+      console.error('Error creating crawl jobs table:', error);
+      throw new Error(`Failed to create crawl jobs table: ${error.message}`);
+    }
+  },
+  
+  /**
+   * Create the crawl results table
+   * @returns {Promise<void>}
+   */
+  async createResultsTable() {
+    const { error } = await supabase.rpc('create_crawl_results_table_ohxp1d');
+    
+    if (error) {
+      console.error('Error creating crawl results table:', error);
+      throw new Error(`Failed to create crawl results table: ${error.message}`);
+    }
+  },
+  
+  /**
+   * Create the crawl errors table
+   * @returns {Promise<void>}
+   */
+  async createErrorsTable() {
+    const { error } = await supabase.rpc('create_crawl_errors_table_ohxp1d');
+    
+    if (error) {
+      console.error('Error creating crawl errors table:', error);
+      throw new Error(`Failed to create crawl errors table: ${error.message}`);
+    }
+  },
+  
+  /**
+   * Create the vendor configs table
+   * @returns {Promise<void>}
+   */
+  async createVendorConfigsTable() {
+    const { error } = await supabase.rpc('create_vendor_configs_table_ohxp1d');
+    
+    if (error) {
+      console.error('Error creating vendor configs table:', error);
+      throw new Error(`Failed to create vendor configs table: ${error.message}`);
+    }
+  },
+  
+  /**
+   * Record a test crawl
+   * @param {Object} params - Test crawl details
+   * @returns {Promise<Object>} - Created test crawl record
+   */
+  async recordTestCrawl(params) {
+    const { url, method, user_email, success, duration, error, data, screenshot, timestamp } = params;
+
+    // Record the test crawl
+    const { data: result, error: insertError } = await supabase
+      .from('test_crawls_ohxp1d')
+      .insert({
+        url,
+        method,
+        user_email,
+        success,
+        duration,
+        error,
+        data,
+        screenshot,
+        timestamp: timestamp || new Date()
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Error recording test crawl:', insertError);
+      throw new Error(`Failed to record test crawl: ${insertError.message}`);
+    }
+
+    return result;
+  },
+
+  formatJobData(job) {
+    if (!job) return null;
+    
+    return {
+      id: job.id,
+      userId: job.user_email,
+      vendorId: job.vendor_id,
+      urls: job.urls,
+      status: job.status,
+      progress: job.progress,
+      creationTime: job.creation_time,
+      completionTime: job.completion_time,
+      error: job.error,
+      settings: job.settings,
+      results: job.results ? job.results.map(result => ({
+        url: result.url,
+        status: result.status,
+        data: result.data,
+        screenshot: result.screenshot,
+        crawlDuration: result.crawl_duration,
+        retryCount: result.retry_count,
+        timestamp: result.timestamp
+      })) : undefined,
+      errors: job.errors ? job.errors.map(error => ({
+        url: error.url,
+        error: error.error,
+        isBlocking: error.is_blocking,
+        timestamp: error.timestamp
+      })) : undefined
+    };
+  },
+
+  /**
+   * Record a test crawl attempt
+   * @param {Object} params - Test parameters
+   * @returns {Promise<Object>} - Recorded test data
+   */
+  async recordTestCrawl(params) {
+    const { url, method, user_email, success, duration, error, timestamp } = params;
+
+    // Create test_crawls table if it doesn't exist
+    const { error: tableError } = await supabase.query(`
+      CREATE TABLE IF NOT EXISTS test_crawls_ohxp1d (
+        id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+        url TEXT NOT NULL,
+        method TEXT NOT NULL,
+        user_email TEXT NOT NULL,
+        success BOOLEAN NOT NULL,
+        duration INTEGER,
+        error TEXT,
+        timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        CONSTRAINT fk_user
+          FOREIGN KEY (user_email)
+          REFERENCES auth.users (email)
+          ON DELETE CASCADE
+      );
+
+      -- Add RLS policies
+      ALTER TABLE test_crawls_ohxp1d ENABLE ROW LEVEL SECURITY;
+      
+      -- Users can only read their own test crawls
+      CREATE POLICY test_crawls_select_policy ON test_crawls_ohxp1d
+        FOR SELECT USING (auth.jwt() ->> 'email' = user_email);
+      
+      -- Users can only insert their own test crawls
+      CREATE POLICY test_crawls_insert_policy ON test_crawls_ohxp1d
+        FOR INSERT WITH CHECK (auth.jwt() ->> 'email' = user_email);
+    `);
+
+    if (tableError) {
+      console.warn('Note: Table might already exist:', tableError);
+    }
+
+    // Record the test crawl
+    const { data, error: insertError } = await supabase
+      .from('test_crawls_ohxp1d')
+      .insert({
+        url,
+        method,
+        user_email,
+        success,
+        duration,
+        error,
+        timestamp
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error('Error recording test crawl:', insertError);
+      throw new Error(`Failed to record test crawl: ${insertError.message}`);
+    }
+
+    return data;
   }
-}
+};
 
-// Create singleton instance
-const dbService = new DBService();
+// Initialize tables on startup
+(async () => {
+  try {
+    // Execute stored procedures to create required functions
+    // Create function to create the jobs table
+    await supabase.rpc('create_function_create_crawl_jobs_table_ohxp1d');
+    
+    // Create function to create the results table
+    await supabase.rpc('create_function_create_crawl_results_table_ohxp1d');
+    
+    // Create function to create the errors table
+    await supabase.rpc('create_function_create_crawl_errors_table_ohxp1d');
+    
+    // Create function to create the vendor configs table
+    await supabase.rpc('create_function_create_vendor_configs_table_ohxp1d');
+    
+    // Ensure tables exist
+    await db.ensureTables();
+    console.log('Database initialized successfully');
+  } catch (error) {
+    console.error('Database initialization error:', error);
+  }
+})();
 
-// Initialize database on startup
-dbService.initializeDatabase()
-  .then(() => console.log('Database initialized successfully'))
-  .catch(err => console.error('Database initialization failed:', err));
-
-module.exports = dbService;
+module.exports = db;

@@ -343,6 +343,93 @@ class CrawlService {
   async getCrawlHistory(userId, filters = {}) {
     return await db.getCrawlHistory(userId, filters);
   }
+
+  /**
+   * Test crawl a single URL
+   * @param {Object} params - Test parameters
+   * @param {string} params.url - URL to crawl
+   * @param {string} params.method - Crawl method ('puppeteer' or 'api')
+   * @param {Object} params.settings - Method-specific settings
+   * @param {string} params.user_email - User's email
+   * @returns {Promise<Object>} - Test results
+   */
+  async testCrawl({ url, method, settings, user_email }) {
+    try {
+      // For API method, use ScrapingBee
+      if (method === 'api') {
+        const response = await fetch('http://localhost:5000/api/scrapingbee/scrape', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ url, ...settings }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`ScrapingBee API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return {
+          data: {
+            url,
+            title: data.title || '',
+            content: data.pageSource || '',
+            timestamp: new Date().toISOString(),
+          },
+          crawlDuration: data.crawlDuration || 0,
+        };
+      }
+
+      // For Puppeteer method
+      const browser = await puppeteer.launch({
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        headless: 'new'
+      });
+
+      try {
+        const startTime = Date.now();
+        const result = await this.crawlSinglePage(browser, url);
+        const crawlDuration = Date.now() - startTime;
+
+        // Record successful test in database
+        await db.recordTestCrawl({
+          url,
+          method,
+          user_email,
+          success: true,
+          duration: crawlDuration,
+          timestamp: new Date()
+        });
+
+        return {
+          ...result,
+          crawlDuration
+        };
+      } finally {
+        await browser.close();
+      }
+    } catch (error) {
+      // Record failed test in database
+      await db.recordTestCrawl({
+        url,
+        method,
+        user_email,
+        success: false,
+        error: error.message,
+        timestamp: new Date()
+      });
+
+      // Enhance error with additional information
+      const enhancedError = new Error(error.message);
+      enhancedError.code = error.code || 'CRAWL_ERROR';
+      enhancedError.status = error.status || 500;
+      if (error.code === 'SERVICE_UNAVAILABLE') {
+        enhancedError.retryAfter = 5;
+      }
+      throw enhancedError;
+    }
+  }
 }
 
 module.exports = new CrawlService();

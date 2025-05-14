@@ -5,6 +5,7 @@ const path = require('path');
 const dotenv = require('dotenv');
 const { createClient } = require('@supabase/supabase-js');
 const crawlRoutes = require('./routes/crawlRoutes');
+const puppeteerCrawlRoutes = require('./routes/puppeteerCrawlRoutes');
 const authMiddleware = require('./middlewares/auth');
 const scrapingBeeProxy = require('./middlewares/scrapingBeeProxy');
 
@@ -36,14 +37,40 @@ if (process.env.NODE_ENV === 'production') {
 // Import mock routes
 const mockRoutes = require('./routes/mockRoutes');
 
-// API routes - Mock routes need to be first to take precedence
-app.use('/api', mockRoutes);
+// Authentication middleware for all routes except test endpoints
+const authenticateRequest = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'No authorization header' });
+    }
 
-// Original routes - these will run if the mock routes don't handle the request
-app.use('/api/crawls', authMiddleware, crawlRoutes);
+    const token = authHeader.split(' ')[1];
+    const { data: { user }, error } = await supabase.auth.getUser(token);
 
-// Add ScrapingBee proxy route - no auth required for testing purposes
-app.use('/api/scrapingbee', scrapingBeeProxy);
+    if (error || !user) {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    req.user = user;
+    next();
+  } catch (error) {
+    console.error('Auth error:', error);
+    res.status(500).json({ error: 'Authentication failed' });
+  }
+};
+
+// Test routes for development
+if (process.env.NODE_ENV === 'development') {
+  app.use('/api/test', mockRoutes);
+}
+
+// Main API routes with authentication
+app.use('/api/crawls', authenticateRequest, crawlRoutes);
+app.use('/api/puppeteer-crawls', authenticateRequest, puppeteerCrawlRoutes);
+
+// ScrapingBee proxy route with authentication
+app.use('/api/scrapingbee', authenticateRequest, scrapingBeeProxy);
 
 // Add Supabase Edge Function proxy route
 app.use('/api/edge-functions', supabaseEdgeProxy);

@@ -8,6 +8,8 @@ import Vendors from './pages/Vendors';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
+import TestPage from './pages/TestPage';
+import TestCrawlerPage from './pages/TestCrawlerPage';
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
 import CrawlerPage from './pages/crawler/CrawlerPage';
@@ -32,6 +34,8 @@ function App() {
               <Route path="reports" element={<Reports />} />
               <Route path="settings" element={<Settings />} />
               <Route path="crawler/:projectId" element={<CrawlerPage />} />
+              <Route path="test" element={<TestPage />} />
+              <Route path="test-crawler" element={<TestCrawlerPage />} />
               <Route path="*" element={<NotFound />} />
             </Route>
             </Routes>
