@@ -1,0 +1,154 @@
+classDiagram
+    class PuppeteerManager {
+        -browserPool: Browser[]
+        -config: PuppeteerConfig
+        +constructor(config: PuppeteerConfig)
+        +getBrowser(): Promise~Browser~
+        +getPage(): Promise~Page~
+        +applyAntiDetection(page: Page): Promise~Page~
+        +randomDelay(): Promise~void~
+        +simulateHumanBehavior(page: Page): Promise~void~
+        +cleanup(): Promise~void~
+    }
+
+    class AntiDetectionService {
+        -userAgents: string[]
+        -fingerprints: object[]
+        +constructor(options: object)
+        +applyToPage(page: Page): Promise~void~
+        +rotateUserAgent(): string
+        +applyFingerprintProtection(page: Page): Promise~void~
+        +generateFakeProfile(): object
+        +maskWebGLFingerprint(page: Page): Promise~void~
+        +evasionTechniques: Map~string, Function~
+    }
+
+    class ProxyRotationService {
+        -proxies: string[]
+        -currentProxyIndex: number
+        -proxyAuth: object
+        +constructor(proxies: string[], proxyAuth: object)
+        +getNextProxy(): string
+        +applyToPage(page: Page): Promise~void~
+        +testProxy(proxy: string): Promise~boolean~
+        +refreshProxyList(): Promise~void~
+        +handleProxyFailure(proxy: string): void
+    }
+
+    class HumanBehaviorSimulator {
+        -config: object
+        +constructor(config: object)
+        +simulateScrolling(page: Page): Promise~void~
+        +simulateMouseMovements(page: Page): Promise~void~
+        +simulateRandomClicks(page: Page): Promise~void~
+        +simulateTyping(page: Page, selector: string, text: string): Promise~void~
+        +simulateViewportChanges(page: Page): Promise~void~
+        +simulateTabSwitching(browser: Browser): Promise~void~
+    }
+
+    class CrawlerService {
+        -activeJobs: Map~string, CrawlJob~
+        -puppeteerManager: PuppeteerManager
+        -antiDetectionService: AntiDetectionService
+        -proxyRotationService: ProxyRotationService
+        -humanBehaviorSimulator: HumanBehaviorSimulator
+        +constructor()
+        +createJob(vendorId: string, urls: string[], settings: object): string
+        +getJob(jobId: string): CrawlJob
+        +cancelJob(jobId: string): boolean
+        +executeCrawl(jobId: string): Promise~void~
+        +crawlWithRetry(url: string, settings: object): Promise~object~
+        +crawlSinglePage(page: Page, url: string, settings: object): Promise~object~
+        +updateJobStatus(jobId: string, status: string, details: object): void
+        +updateJobProgress(jobId: string, progress: number): void
+        +cleanup(): Promise~void~
+    }
+
+    class CrawlJob {
+        +id: string
+        +vendorId: string
+        +urls: string[]
+        +settings: object
+        +status: string
+        +progress: number
+        +results: object[]
+        +errors: object[]
+        +creationTime: Date
+        +completionTime: Date
+        +constructor(id: string, vendorId: string, urls: string[], settings: object)
+    }
+
+    class CrawlAPI {
+        -crawlerService: CrawlerService
+        -configManager: ConfigurationManager
+        +constructor(crawlerService: CrawlerService, configManager: ConfigurationManager)
+        +createCrawlJob(req: Request, res: Response): Promise~void~
+        +getCrawlJobStatus(req: Request, res: Response): Promise~void~
+        +cancelCrawlJob(req: Request, res: Response): Promise~void~
+        +getCrawlResults(req: Request, res: Response): Promise~void~
+        +getVendorConfigurations(req: Request, res: Response): Promise~void~
+        +updateVendorConfiguration(req: Request, res: Response): Promise~void~
+    }
+
+    class ConfigurationManager {
+        -db: Database
+        +constructor(db: Database)
+        +getVendorConfig(vendorId: string): Promise~object~
+        +updateVendorConfig(vendorId: string, config: object): Promise~void~
+        +getDefaultConfig(): object
+        +validateConfig(config: object): boolean
+        +mergeWithDefault(config: object): object
+    }
+
+    class PuppeteerConfig {
+        +maxConcurrent: number
+        +userAgents: string[]
+        +minDelay: number
+        +maxDelay: number
+        +proxySettings: object
+        +viewportSettings: object
+        +simulateHumanBehavior: boolean
+        +browserArgs: string[]
+    }
+
+    class CrawlResult {
+        +id: string
+        +url: string
+        +vendorId: string
+        +sessionId: string
+        +status: string
+        +data: object
+        +screenshot: string
+        +timestamp: Date
+        +crawlDuration: number
+        +retryCount: number
+        +success: boolean
+        +errorMessage: string
+        +blockingDetected: boolean
+        +blockType: string
+    }
+
+    class Database {
+        +constructor(config: object)
+        +createCrawlJob(job: CrawlJob): Promise~string~
+        +updateCrawlJob(jobId: string, updates: object): Promise~void~
+        +getCrawlJob(jobId: string): Promise~CrawlJob~
+        +listCrawlJobs(vendorId: string, limit: number): Promise~CrawlJob[]~
+        +storeCrawlResult(result: CrawlResult): Promise~string~
+        +getCrawlResults(jobId: string): Promise~CrawlResult[]~
+        +recordCrawlError(jobId: string, url: string, error: string): Promise~void~
+        +getVendorConfig(vendorId: string): Promise~object~
+        +updateVendorConfig(vendorId: string, config: object): Promise~void~
+    }
+
+    PuppeteerManager "1" *-- "*" PuppeteerConfig : configures
+    CrawlerService "1" *-- "1" PuppeteerManager : uses
+    CrawlerService "1" *-- "1" AntiDetectionService : uses
+    CrawlerService "1" *-- "1" ProxyRotationService : uses
+    CrawlerService "1" *-- "1" HumanBehaviorSimulator : uses
+    CrawlerService "1" *-- "*" CrawlJob : manages
+    CrawlAPI "1" *-- "1" CrawlerService : uses
+    CrawlAPI "1" *-- "1" ConfigurationManager : uses
+    ConfigurationManager "1" *-- "1" Database : uses
+    CrawlerService "1" *-- "1" Database : uses
+    CrawlJob "1" *-- "*" CrawlResult : produces

@@ -8,10 +8,15 @@
 
 import axios from 'axios';
 
+// Get the API base URL from environment variables or default to current host
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
+  (window.location.hostname === 'localhost' ? 'http://localhost:4000' : '');
+
+console.log('ProxyApiClient using base URL:', API_BASE_URL);
+
 // Create a dedicated Axios instance for proxy requests
 const proxyApiClient = axios.create({
-  // Empty baseURL - we'll use relative URLs that will be resolved against the current page origin
-  baseURL: '',
+  baseURL: API_BASE_URL,
   timeout: 60000, // 60 seconds timeout for scraping operations which may take longer
   headers: {
     'Content-Type': 'application/json',

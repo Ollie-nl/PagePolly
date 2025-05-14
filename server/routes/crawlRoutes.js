@@ -178,4 +178,69 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+/**
+ * Test crawler with a single URL
+ * POST /api/crawls/test
+ */
+router.post('/test', async (req, res, next) => {
+  try {
+    const { url, method, settings, user_email } = req.body;
+
+    // Validate URL
+    try {
+      new URL(url);
+    } catch (e) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid URL format',
+        message: 'Please provide a valid URL including protocol (http:// or https://)'
+      });
+    }
+
+    // Validate method
+    if (!['puppeteer', 'api'].includes(method)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid method',
+        message: 'Method must be either "puppeteer" or "api"'
+      });
+    }
+
+    // Start test crawl
+    const result = await crawlService.testCrawl({
+      url,
+      method,
+      settings,
+      user_email
+    });
+
+    res.json({
+      success: true,
+      data: result.data,
+      screenshot: result.screenshot,
+      crawlDuration: result.crawlDuration,
+      message: 'Test crawl completed successfully'
+    });
+  } catch (error) {
+    console.error('Test crawl error:', error);
+    
+    // Handle specific error types
+    if (error.code === 'SERVICE_UNAVAILABLE') {
+      return res.status(503).json({
+        success: false,
+        error: 'Service temporarily unavailable',
+        message: error.message,
+        retryAfter: error.retryAfter || 5
+      });
+    }
+
+    // Handle other errors
+    res.status(error.status || 500).json({
+      success: false,
+      error: error.name || 'CrawlError',
+      message: error.message || 'An unexpected error occurred during test crawl'
+    });
+  }
+});
+
 module.exports = router;

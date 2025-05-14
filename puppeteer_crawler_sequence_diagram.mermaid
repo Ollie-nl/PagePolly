@@ -1,0 +1,91 @@
+sequenceDiagram
+    participant C as Client
+    participant API as CrawlAPI
+    participant CS as CrawlerService
+    participant PM as PuppeteerManager
+    participant ADS as AntiDetectionService
+    participant PRS as ProxyRotationService
+    participant HBS as HumanBehaviorSimulator
+    participant DB as Database
+    participant PP as Puppeteer
+    
+    %% Create and start a crawl job
+    C->>API: POST /api/crawls (vendorId, urls, settings)
+    API->>CS: createJob(vendorId, urls, settings)
+    CS->>DB: createCrawlJob(job)
+    DB-->>CS: jobId
+    CS->>CS: executeCrawl(jobId) [async]
+    API-->>C: 202 Accepted (jobId)
+    
+    %% Execution flow of a crawl job
+    CS->>DB: updateCrawlJob(jobId, {status: "running"})
+    loop For each URL in job
+        CS->>CS: crawlWithRetry(url, settings)
+        activate CS
+        
+        %% Configure Puppeteer with anti-detection
+        CS->>PM: getPage()
+        PM->>PP: launch(browserArgs)
+        PP-->>PM: browser
+        PM->>PP: browser.newPage()
+        PP-->>PM: page
+        PM->>ADS: applyToPage(page)
+        ADS->>PP: Various anti-detection methods
+        PM->>PRS: applyToPage(page)
+        PRS->>PP: Set proxy for request
+        PM-->>CS: page
+        
+        %% Perform the crawling with retry logic
+        loop Until success or max retries
+            CS->>PM: randomDelay()
+            PM-->>CS: delay complete
+            
+            CS->>PP: page.goto(url, options)
+            PP-->>CS: navigation complete or error
+            
+            alt Navigation successful
+                CS->>HBS: simulateHumanBehavior(page)
+                HBS->>PP: Scroll, move mouse, etc.
+                PP-->>HBS: actions complete
+                
+                CS->>PP: page.evaluate() & screenshot()
+                PP-->>CS: pageData & screenshot
+                CS->>DB: storeCrawlResult(result)
+                DB-->>CS: resultId
+                
+                CS->>DB: updateCrawlJob(jobId, {progress})
+                DB-->>CS: updated
+            else Navigation failed (e.g., 503 error)
+                CS->>CS: Apply exponential backoff
+                CS->>PRS: handleProxyFailure(currentProxy)
+                CS->>PRS: getNextProxy()
+                PRS-->>CS: nextProxy
+                CS->>PM: applyAntiDetection(page) with new settings
+            end
+        end
+        
+        deactivate CS
+    end
+    
+    %% Completing the job
+    CS->>DB: updateCrawlJob(jobId, {status: "completed", results})
+    DB-->>CS: updated
+    
+    %% Client checking status
+    C->>API: GET /api/crawls/{jobId}
+    API->>DB: getCrawlJob(jobId)
+    DB-->>API: job
+    API-->>C: 200 OK (job)
+    
+    %% Client retrieving results
+    C->>API: GET /api/crawls/{jobId}/results
+    API->>DB: getCrawlResults(jobId)
+    DB-->>API: results
+    API-->>C: 200 OK (results)
+    
+    %% Cancel job flow (optional)
+    C->>API: DELETE /api/crawls/{jobId}
+    API->>CS: cancelJob(jobId)
+    CS->>DB: updateCrawlJob(jobId, {status: "cancelled"})
+    DB-->>CS: updated
+    API-->>C: 200 OK

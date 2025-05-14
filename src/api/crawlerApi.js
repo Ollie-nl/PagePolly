@@ -1,9 +1,12 @@
 import axios from 'axios';
+import axiosRetry from 'axios-retry';
 
 /**
  * API Client for Crawler Service
  * This module handles all the API calls to the crawler backend service
  */
+
+// Install axios-retry first
 
 // Create a separate axios instance for crawler service
 const crawlerClient = axios.create({
@@ -15,6 +18,38 @@ const crawlerClient = axios.create({
     'Content-Type': 'application/json'
   }
 });
+
+// Configure axios-retry
+axiosRetry(crawlerClient, {
+  retries: 3,
+  retryDelay: (retryCount) => {
+    return retryCount * 1000; // exponential delay: 1s, 2s, 3s
+  },
+  retryCondition: (error) => {
+    // Retry on network errors or 503 Service Unavailable
+    return axiosRetry.isNetworkOrIdempotentRequestError(error) || 
+           error.response?.status === 503;
+  },
+  onRetry: (retryCount, error, requestConfig) => {
+    console.log(
+      `Retrying request (${retryCount}/3) due to ${error.response?.status || 'network'} error:`,
+      requestConfig.url
+    );
+  }
+});
+
+// Add response interceptor for better error handling
+crawlerClient.interceptors.response.use(
+  response => response,
+  error => {
+    // Let axios-retry handle the retries
+    if (!error.response) {
+      console.error('Network error:', error.message);
+      return Promise.reject(new Error('Could not connect to the crawler service'));
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Add request interceptor to inject the API key into the headers
 crawlerClient.interceptors.request.use(config => {
@@ -186,7 +221,13 @@ export const cancelCrawlJob = async (jobId) => {
   }
 };
 
+// Export individual functions and client
+export {
+  crawlerClient,
+};
+
 export default {
+  crawlerClient,
   startCrawlJob,
   getCrawlJobDetails,
   getActiveCrawlJobs,
