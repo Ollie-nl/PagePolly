@@ -13,12 +13,15 @@ import {
   Radio,
   Alert,
   LinearProgress,
-  Paper
+  Paper,
+  InputAdornment,
+  IconButton
 } from '@mui/material';
 import { useSelector } from 'react-redux';
 import PuppeteerCrawlOption from './PuppeteerCrawlOption';
 import supabaseClient from '../lib/supabaseClient';
 import { crawlerClient } from '../api/crawlerApi';
+import LinkIcon from '@mui/icons-material/Link';
 
 const TestCrawler = () => {
   const [url, setUrl] = useState('');
@@ -40,8 +43,18 @@ const TestCrawler = () => {
   const apiKey = settings?.api_key?.trim() || '';
 
   const handleStartTest = async () => {
-    if (!url.trim()) {
-      setError('Please enter a valid URL');
+    // Validate URL format
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) {
+      setError('Please enter a URL');
+      return;
+    }
+    
+    // Check if URL includes protocol
+    try {
+      new URL(trimmedUrl);
+    } catch (e) {
+      setError('Please enter a valid URL including protocol (http:// or https://)');
       return;
     }
 
@@ -82,7 +95,7 @@ const TestCrawler = () => {
       }
 
       const payload = {
-        url: url.trim(),
+        url: trimmedUrl,
         method: crawlMethod,
         settings: crawlMethod === 'puppeteer' ? puppeteerSettings : { api_key: apiKey },
         user_email: user.email
@@ -171,6 +184,14 @@ const TestCrawler = () => {
             placeholder="https://example.com"
             disabled={status === 'running'}
             sx={{ mb: 3 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <LinkIcon color="action" />
+                </InputAdornment>
+              ),
+            }}
+            helperText="Enter a complete URL including http:// or https://"
           />
 
           <Button

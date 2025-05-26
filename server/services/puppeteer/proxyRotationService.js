@@ -102,8 +102,9 @@ class ProxyRotationService {
    * @returns {Promise<boolean>} Whether the proxy is working
    */
   async testProxy(proxy) {
-    const fetch = require('node-fetch');
-    const HttpsProxyAgent = require('https-proxy-agent');
+    // We'll use ESM import here
+    const fetch = (await import('node-fetch')).default;
+    const { default: HttpsProxyAgent } = await import('https-proxy-agent');
 
     try {
       // Set up proxy agent
@@ -243,4 +244,4 @@ class ProxyRotationService {
   }
 }
 
-module.exports = ProxyRotationService;
+export default ProxyRotationService;

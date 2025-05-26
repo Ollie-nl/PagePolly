@@ -1,5 +1,5 @@
 // server/middleware/validators.js
-const { body, query, validationResult } = require('express-validator');
+import { body, query, validationResult } from 'express-validator';
 
 /**
  * Middleware for validating API requests
@@ -136,4 +136,5 @@ const validators = {
   ]
 };
 
-module.exports = validators;
+export default validators;
+export const { validateCrawlRequest, validatePaginationParams, validateJobId, validateVendorConfig } = validators;

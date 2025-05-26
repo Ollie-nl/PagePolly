@@ -1,7 +1,8 @@
 // server/routes/crawlRoutes.js
-const express = require('express');
+import express from 'express';
+import crawlService from '../services/crawlService.js';
+
 const router = express.Router();
-const crawlService = require('../services/crawlService');
 
 /**
  * Start a new crawl job
@@ -243,4 +244,4 @@ router.post('/test', async (req, res, next) => {
   }
 });
 
-module.exports = router;
+export default router;

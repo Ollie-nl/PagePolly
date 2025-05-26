@@ -1,76 +1,72 @@
-// server/middleware/auth.js
-const jwt = require('jsonwebtoken');
+// server/middlewares/auth.js
+import { createClient } from '@supabase/supabase-js';
+import path from 'path';
+import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import process from 'process';
+
+// Get current directory (ESM doesn't have __dirname)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables
+dotenv.config({ path: path.join(__dirname, '../../.env') });
+
+const supabaseUrl = process.env?.VITE_SUPABASE_URL;
+const supabaseAnonKey = process.env?.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase credentials in environment variables');
+}
+
+// Initialize Supabase client
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
- * Authentication middleware for API routes
- * Validates JWT tokens from Supabase Auth
+ * Middleware to verify authentication token
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next function
  */
-const authMiddleware = {
-  /**
-   * Verify and decode the JWT token from the request header
-   * @param {Object} req - Express request object
-   * @param {Object} res - Express response object
-   * @param {Function} next - Express next function
-   */
-  authenticateToken(req, res, next) {
-    // Get the authorization header from the request
+const authMiddleware = async (req, res, next) => {
+  try {
+    // Extract token from Authorization header
     const authHeader = req.headers.authorization;
-    
-    if (!authHeader) {
-      return res.status(401).json({ error: 'Missing authorization header' });
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Authentication token is required'
+      });
     }
-    
-    // Extract the JWT token
+
     const token = authHeader.split(' ')[1];
-    
     if (!token) {
-      return res.status(401).json({ error: 'Invalid authorization format' });
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Invalid authentication token format'
+      });
     }
-    
-    try {
-      // Verify the token
-      // Note: In production, you would use the Supabase JWT secret
-      // For now, we're just decoding to extract the user info
-      const decoded = jwt.decode(token);
-      
-      if (!decoded) {
-        throw new Error('Invalid token');
-      }
-      
-      // Extract user info from Supabase JWT claims
-      const user = {
-        id: decoded.sub,
-        email: decoded.email,
-        role: decoded.role || 'authenticated'
-      };
-      
-      // Attach user to request object
-      req.user = user;
-      
-      next();
-    } catch (error) {
-      console.error('Authentication error:', error);
-      return res.status(403).json({ error: 'Invalid or expired token' });
+
+    // Verify token with Supabase
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Invalid or expired authentication token'
+      });
     }
-  },
-  
-  /**
-   * Check if the user has admin role
-   * @param {Object} req - Express request object
-   * @param {Object} res - Express response object
-   * @param {Function} next - Express next function
-   */
-  requireAdmin(req, res, next) {
-    if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
-    
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Admin privileges required' });
-    }
-    
+
+    // Attach user to request
+    req.user = user;
     next();
+  } catch (error) {
+    console.error('Auth middleware error:', error);
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: 'An error occurred during authentication'
+    });
   }
 };
 
-module.exports = authMiddleware;
+export default authMiddleware;

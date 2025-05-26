@@ -21,6 +21,7 @@ import {
   Dashboard as DashboardIcon,
   Settings as SettingsIcon,
   BugReport as TestIcon,
+  BugReport as BugReportIcon,
   Store as VendorsIcon,
   Assessment as ReportsIcon,
   ExitToApp as LogoutIcon
@@ -55,6 +56,7 @@ const MainLayout = () => {
     { text: 'Reports', icon: <ReportsIcon />, path: '/reports' },
     { text: 'Test Crawler', icon: <TestIcon />, path: '/test-crawler' },
     { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
+    { text: 'Error Logs', icon: <BugReportIcon />, path: '/error-logs' },
   ];
 
   const drawer = (

@@ -1,6 +1,6 @@
 // server/routes/mockRoutes.js
-const express = require('express');
-const { v4: uuidv4 } = require('uuid');
+import express from 'express';
+import { v4 as uuidv4 } from 'uuid';
 const router = express.Router();
 
 // Mock storage for active crawl jobs and history
@@ -368,4 +368,4 @@ router.delete('/vendors/:id', (req, res) => {
   res.status(204).end();
 });
 
-module.exports = router;
+export default router;

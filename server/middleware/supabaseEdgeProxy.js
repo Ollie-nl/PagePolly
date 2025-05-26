@@ -1,8 +1,14 @@
 // server/middlewares/supabaseEdgeProxy.js
-const express = require('express');
-const { createClient } = require('@supabase/supabase-js');
-const dotenv = require('dotenv');
-const path = require('path');
+import express from 'express';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import process from 'process';
+
+// Get current directory (ESM doesn't have __dirname)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables if not already loaded
 dotenv.config({ path: path.join(__dirname, '../../.env') });
@@ -10,8 +16,8 @@ dotenv.config({ path: path.join(__dirname, '../../.env') });
 const router = express.Router();
 
 // Create Supabase client with service role key for server-side operations
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const supabaseUrl = process.env?.SUPABASE_URL;
+const supabaseServiceKey = process.env?.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!supabaseUrl || !supabaseServiceKey) {
   console.error('SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY environment variables are missing');
@@ -91,4 +97,4 @@ router.post('/stop-crawler', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

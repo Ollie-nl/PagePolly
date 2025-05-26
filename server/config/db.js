@@ -1,21 +1,32 @@
 // server/config/db.js
-const { createClient } = require('@supabase/supabase-js');
-const dotenv = require('dotenv');
-const path = require('path');
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import process from 'process';
+
+// Get current directory (ESM doesn't have __dirname)
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Load environment variables from .env file
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 // Check for required environment variables
-if (!process.env.SUPABASE_URL || !process.env.SUPABASE_ANON_KEY) {
+const SUPABASE_URL = process.env?.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env?.SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.error('Missing Supabase environment variables. Please check your .env file.');
-  process.exit(1);
+  // In ESM context, we need to handle process differently
+  if (typeof process !== 'undefined') {
+    process.exit(1);
+  }
 }
 
 // Initialize Supabase client
 const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_ANON_KEY
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
 );
 
 /**
@@ -414,39 +425,6 @@ const db = {
     }
   },
   
-  /**
-   * Record a test crawl
-   * @param {Object} params - Test crawl details
-   * @returns {Promise<Object>} - Created test crawl record
-   */
-  async recordTestCrawl(params) {
-    const { url, method, user_email, success, duration, error, data, screenshot, timestamp } = params;
-
-    // Record the test crawl
-    const { data: result, error: insertError } = await supabase
-      .from('test_crawls_ohxp1d')
-      .insert({
-        url,
-        method,
-        user_email,
-        success,
-        duration,
-        error,
-        data,
-        screenshot,
-        timestamp: timestamp || new Date()
-      })
-      .select()
-      .single();
-
-    if (insertError) {
-      console.error('Error recording test crawl:', insertError);
-      throw new Error(`Failed to record test crawl: ${insertError.message}`);
-    }
-
-    return result;
-  },
-
   formatJobData(job) {
     if (!job) return null;
     
@@ -568,4 +546,4 @@ const db = {
   }
 })();
 
-module.exports = db;
+export default db;

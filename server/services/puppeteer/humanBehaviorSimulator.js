@@ -238,4 +238,4 @@ const humanBehaviorSimulator = {
   }
 };
 
-module.exports = humanBehaviorSimulator;
+export default humanBehaviorSimulator;

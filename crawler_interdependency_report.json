@@ -1,0 +1,39 @@
+{
+  "flow_chart": "Generated flow chart showing interactions between crawlers",
+  "key_interdependencies": [
+    {
+      "title": "Shared Test Method in crawlService.js",
+      "description": "The testCrawl method contains logic for both Puppeteer and API crawlers, selected by a 'method' parameter",
+      "risk": "If method parameter is incorrectly set or defaults, it could trigger API calls when Puppeteer was intended"
+    },
+    {
+      "title": "Error Propagation and Shared Error Handling",
+      "description": "Both crawlers use similar error handling patterns, with 503 errors being common",
+      "risk": "Errors in one system could be incorrectly attributed to the other"
+    },
+    {
+      "title": "Module Loading Conflicts",
+      "description": "The system has mixed CommonJS and ES Module syntax which could lead to unpredictable behavior",
+      "risk": "Improper module loading may cause unexpected API calls or error logging"
+    },
+    {
+      "title": "Error Reporting in UI",
+      "description": "Error logs are currently using mock data that may not accurately distinguish between crawler types",
+      "risk": "Users may see API errors even when Puppeteer was the only crawler used"
+    }
+  ],
+  "root_cause_analysis": {
+    "why_api_errors_with_puppeteer": [
+      "The testCrawl method in crawlService.js selects between API and Puppeteer based on method parameter",
+      "There may be implicit fallbacks to API methods when Puppeteer fails",
+      "Error logging may not accurately distinguish between error sources",
+      "Module conflicts between CommonJS and ES Modules may cause unexpected behavior"
+    ]
+  },
+  "recommendation": [
+    "Clearly separate the Puppeteer and API crawler implementations",
+    "Fix module conflicts by standardizing on one module system",
+    "Implement proper error source tracking in logs",
+    "Add explicit logging when method selection occurs"
+  ]
+}

@@ -1,10 +1,16 @@
 // server/server.js
-const express = require('express');
-const path = require('path');
-const dotenv = require('dotenv');
-const bodyParser = require('body-parser');
-const cors = require('cors');
-const rateLimit = require('express-rate-limit');
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+import bodyParser from 'body-parser';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
+import process from 'process';
+
+// ES modules fix for __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Configure rate limiter
 const healthCheckLimiter = rateLimit({
@@ -16,7 +22,7 @@ const healthCheckLimiter = rateLimit({
 dotenv.config({ path: path.join(__dirname, '../.env') });
 
 // Initialize puppeteer manager
-const puppeteerManager = require('./services/puppeteer/puppeteerManager');
+import puppeteerManager from './services/puppeteer/puppeteerManager.js';
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -106,7 +112,7 @@ app.get('/api/health', healthCheckLimiter, async (req, res) => {
 app.use(express.static(path.join(__dirname, '../dist')));
 
 // API Routes
-const puppeteerCrawlRoutes = require('./routes/puppeteerCrawlRoutes');
+import puppeteerCrawlRoutes from './routes/puppeteerCrawlRoutes.js';
 
 // Use API routes
 app.use('/api/crawls', puppeteerCrawlRoutes);
@@ -213,4 +219,4 @@ async function gracefulShutdown() {
   }, 10000);
 }
 
-module.exports = server;
+export default server;

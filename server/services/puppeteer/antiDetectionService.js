@@ -303,4 +303,4 @@ const antiDetectionService = {
   }
 };
 
-module.exports = antiDetectionService;
+export default antiDetectionService;

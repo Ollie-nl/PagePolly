@@ -1,5 +1,7 @@
 // server/services/puppeteer/puppeteerManager.js
-const puppeteer = require('puppeteer-extra');
+import puppeteerExtra from 'puppeteer-extra';
+import process from 'process';
+const puppeteer = puppeteerExtra;
 
 class PuppeteerManager {
   constructor() {
@@ -183,4 +185,5 @@ class PuppeteerManager {
   }
 }
 
-module.exports = new PuppeteerManager();
+const puppeteerManager = new PuppeteerManager();
+export default puppeteerManager;

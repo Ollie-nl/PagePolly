@@ -1,13 +1,19 @@
 // server/index.js
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const dotenv = require('dotenv');
-const { createClient } = require('@supabase/supabase-js');
-const crawlRoutes = require('./routes/crawlRoutes');
-const puppeteerCrawlRoutes = require('./routes/puppeteerCrawlRoutes');
-const authMiddleware = require('./middlewares/auth');
-const scrapingBeeProxy = require('./middlewares/scrapingBeeProxy');
+import express from 'express';
+import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
+import process from 'process';
+import crawlRoutes from './routes/crawlRoutes.js';
+import puppeteerCrawlRoutes from './routes/puppeteerCrawlRoutes.js';
+import authMiddleware from './middleware/auth.js';
+import createScrapingBeeProxy from './middleware/scrapingBeeProxy.js';
+
+// ES modules fix for __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '../.env') });
@@ -22,7 +28,7 @@ const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY;
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Import Supabase Edge Function proxy middleware
-const supabaseEdgeProxy = require('./middlewares/supabaseEdgeProxy');
+import supabaseEdgeProxy from './middlewares/supabaseEdgeProxy.js';
 
 // Middleware
 app.use(cors());
@@ -35,7 +41,7 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 // Import mock routes
-const mockRoutes = require('./routes/mockRoutes');
+import mockRoutes from './routes/mockRoutes.js';
 
 // Authentication middleware for all routes except test endpoints
 const authenticateRequest = async (req, res, next) => {
@@ -70,7 +76,7 @@ app.use('/api/crawls', authenticateRequest, crawlRoutes);
 app.use('/api/puppeteer-crawls', authenticateRequest, puppeteerCrawlRoutes);
 
 // ScrapingBee proxy route with authentication
-app.use('/api/scrapingbee', authenticateRequest, scrapingBeeProxy);
+app.use('/api/scrapingbee', authenticateRequest, createScrapingBeeProxy());
 
 // Add Supabase Edge Function proxy route
 app.use('/api/edge-functions', supabaseEdgeProxy);
@@ -97,4 +103,4 @@ app.listen(PORT, () => {
   console.log(`API available at http://localhost:${PORT}/api`);
 });
 
-module.exports = app;
+export default app;

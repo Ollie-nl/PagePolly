@@ -1,7 +1,7 @@
 // server/services/crawlService.js
-const puppeteer = require('puppeteer');
-const { v4: uuidv4 } = require('uuid');
-const db = require('../config/db');
+import puppeteer from 'puppeteer';
+import { v4 as uuidv4 } from 'uuid';
+import db from '../config/db.js';
 
 /**
  * Service for handling web crawling operations
@@ -432,4 +432,4 @@ class CrawlService {
   }
 }
 
-module.exports = new CrawlService();
+export default new CrawlService();

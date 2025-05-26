@@ -1,9 +1,9 @@
 // server/services/puppeteer/puppeteerCrawlerService.js
-const puppeteer = require('puppeteer-extra');
-const StealthPlugin = require('puppeteer-extra-plugin-stealth');
-const AdblockerPlugin = require('puppeteer-extra-plugin-adblocker');
-const db = require('../../config/db');
-const { v4: uuidv4 } = require('uuid');
+import puppeteer from 'puppeteer-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import AdblockerPlugin from 'puppeteer-extra-plugin-adblocker';
+import db from '../../config/db.js';
+import { v4 as uuidv4 } from 'uuid';
 
 // Add plugins
 puppeteer.use(StealthPlugin());
@@ -64,10 +64,14 @@ class PuppeteerCrawlerService {
 
     try {
       // Update job status to running
-      await db.updateCrawlJob(jobId, { status: 'running' });
+      console.log(`Updating job ${jobId} status to 'running'`);
+await db.updateCrawlJob(jobId, { status: 'running' });
 
       // Get browser instance
-      browser = await this.puppeteerManager.getBrowser();
+      console.log('Attempting to get Puppeteer browser instance');
+browser = const browser = await this.puppeteerManager.getBrowser();
+console.log('Browser instance details:', JSON.stringify(browser));
+console.log('Puppeteer browser instance acquired');
       
       const totalUrls = urls.length;
       let completedUrls = 0;
@@ -91,7 +95,8 @@ class PuppeteerCrawlerService {
         // Update progress
         completedUrls++;
         const progress = Math.round((completedUrls / totalUrls) * 100);
-        await db.updateCrawlJob(jobId, { progress });
+        console.log(`Updating job ${jobId} progress to ${progress}%`);
+await db.updateCrawlJob(jobId, { progress });
       }
 
       // Update final status
@@ -102,6 +107,9 @@ class PuppeteerCrawlerService {
 
     } catch (error) {
       console.error(`Job ${jobId} failed:`, error);
+console.error('Error stack trace:', error.stack);
+console.error('Request headers:', JSON.stringify(browser.requestHeaders));
+console.error('Response headers:', JSON.stringify(browser.responseHeaders));
       await db.updateCrawlJob(jobId, {
         status: 'failed',
         error: error.message,
@@ -267,4 +275,20 @@ class PuppeteerCrawlerService {
   }
 }
 
-module.exports = PuppeteerCrawlerService;
+export default PuppeteerCrawlerService;
+
+// Function to log DNS resolution details
+async function logDNSResolution(url) {
+  try {
+    const dns = require('dns');
+    dns.lookup(url, (err, address, family) => {
+      if (err) {
+        console.error('DNS resolution error:', err);
+      } else {
+        console.log(`DNS resolution for ${url}: Address - ${address}, Family - IPv${family}`);
+      }
+    });
+  } catch (error) {
+    console.error('Failed to log DNS resolution:', error);
+  }
+}

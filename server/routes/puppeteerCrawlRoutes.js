@@ -1,11 +1,12 @@
 // server/routes/puppeteerCrawlRoutes.js
-const express = require('express');
+import express from 'express';
+import { authenticateToken } from '../middleware/auth.js';
+import { validateCrawlRequest, validateJobId, validatePaginationParams } from '../middleware/validators.js';
+import PuppeteerCrawlerService from '../services/puppeteer/puppeteerCrawlerService.js';
+import puppeteerManager from '../services/puppeteer/puppeteerManager.js';
+import db from '../config/db.js';
+
 const router = express.Router();
-const { authenticateToken } = require('../middleware/auth');
-const { validateCrawlRequest, validateJobId, validatePaginationParams } = require('../middleware/validators');
-const PuppeteerCrawlerService = require('../services/puppeteer/puppeteerCrawlerService');
-const puppeteerManager = require('../services/puppeteer/puppeteerManager');
-const db = require('../config/db');
 
 const crawlerService = new PuppeteerCrawlerService(puppeteerManager);
 
@@ -157,4 +158,4 @@ router.get('/',
   }
 );
 
-module.exports = router;
+export default router;
