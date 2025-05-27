@@ -1,14 +1,31 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import apiClient from '../../api/apiClient';
+import supabaseClient from '../../lib/supabaseClient';
+
+// Functie om vendors uit de Supabase database te halen
+const getVendorsFromDatabase = async () => {
+  try {
+    console.log('Vendors ophalen uit database...');
+    const { data, error } = await supabaseClient
+      .from('vendors_ohxp1d')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Fout bij ophalen vendors uit database:', error);
+    throw error;
+  }
+};
 
 export const fetchVendors = createAsyncThunk(
   'vendors/fetchAll',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await apiClient.get('/api/vendors');
-      return response.data;
+      const vendors = await getVendorsFromDatabase();
+      return vendors;
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Failed to fetch vendors');
+      return rejectWithValue(error.message || 'Failed to fetch vendors');
     }
   }
 );
@@ -17,10 +34,18 @@ export const addVendor = createAsyncThunk(
   'vendors/add',
   async (vendorData, { rejectWithValue }) => {
     try {
-      const response = await apiClient.post('/api/vendors', vendorData);
-      return response.data;
+      console.log('Vendor toevoegen in database:', vendorData);
+      
+      const { data, error } = await supabaseClient
+        .from('vendors_ohxp1d')
+        .insert([vendorData])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Failed to add vendor');
+      return rejectWithValue(error.message || 'Failed to add vendor');
     }
   }
 );
@@ -29,10 +54,19 @@ export const updateVendor = createAsyncThunk(
   'vendors/update',
   async ({ id, data }, { rejectWithValue }) => {
     try {
-      const response = await apiClient.put(`/api/vendors/${id}`, data);
-      return response.data;
+      console.log(`Vendor ${id} bijwerken in database:`, data);
+      
+      const { data: updatedVendor, error } = await supabaseClient
+        .from('vendors_ohxp1d')
+        .update(data)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return updatedVendor;
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Failed to update vendor');
+      return rejectWithValue(error.message || 'Failed to update vendor');
     }
   }
 );
@@ -41,10 +75,17 @@ export const deleteVendor = createAsyncThunk(
   'vendors/delete',
   async (id, { rejectWithValue }) => {
     try {
-      await apiClient.delete(`/api/vendors/${id}`);
+      console.log(`Vendor ${id} verwijderen uit database`);
+      
+      const { error } = await supabaseClient
+        .from('vendors_ohxp1d')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
       return id;
     } catch (error) {
-      return rejectWithValue(error.response?.data || 'Failed to delete vendor');
+      return rejectWithValue(error.message || 'Failed to delete vendor');
     }
   }
 );

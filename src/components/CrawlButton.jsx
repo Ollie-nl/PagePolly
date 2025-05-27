@@ -59,9 +59,9 @@ const CrawlButton = ({ vendorId, onCrawlComplete }) => {
         },
         body: JSON.stringify({
           vendorId,
-          method: crawlMethod,
+          crawlerType: crawlMethod,
           settings: crawlMethod === 'puppeteer' ? puppeteerSettings : { api_key: apiKey },
-          user_email: user.email
+          userId: user.email
         }),
       });
 

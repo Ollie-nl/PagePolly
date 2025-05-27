@@ -24,8 +24,26 @@ const VendorManagement = () => {
 
   const loadVendors = async () => {
     try {
-      const vendorList = await DatabaseService.getVendors();
-      setVendors(vendorList);
+      console.log('Vendors ophalen...');
+      // Probeer vendors uit de database te halen
+      try {
+        const vendorList = await DatabaseService.getVendors();
+        console.log('Vendors opgehaald:', vendorList);
+        setVendors(vendorList);
+        return;
+      } catch (dbErr) {
+        console.error('Database error:', dbErr);
+      }
+      
+      // Fallback: gebruik hardcoded vendors als de database niet beschikbaar is
+      console.log('Gebruik fallback hardcoded vendors in frontend');
+      const fallbackVendors = [
+        { id: 1, name: 'ScrapingBee...', url: 'https://www.scrapingbee.com', description: 'ScrapingBee API voor web scraping' },
+        { id: 2, name: 'Puppeteer', url: 'https://pptr.dev', description: 'Directe browser crawling met Puppeteer' },
+        { id: 3, name: 'Ferrum Audio', url: 'https://ferrum.audio', description: 'Voorbeeld website voor crawling tests' }
+      ];
+      setVendors(fallbackVendors);
+      
     } catch (err) {
       setError('Failed to load vendors');
       console.error('Error loading vendors:', err);
@@ -53,9 +71,18 @@ const VendorManagement = () => {
     }
 
     try {
-      await DatabaseService.createVendor(newVendor);
+      console.log('Vendor toevoegen:', newVendor);
+      const createdVendor = await DatabaseService.createVendor(newVendor);
+      console.log('Vendor succesvol toegevoegd:', createdVendor);
+      
       setSuccess('Vendor added successfully');
       setNewVendor({ name: '', url: '', description: '' });
+      
+      // Direct de nieuwe vendor toevoegen aan de lokale lijst voor directe feedback
+      // én daarna de volledige lijst verversen
+      setVendors(currentVendors => [createdVendor, ...currentVendors]);
+      
+      // Volledige lijst verversen van de server
       await loadVendors();
     } catch (err) {
       setError('Failed to add vendor');

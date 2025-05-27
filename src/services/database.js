@@ -253,7 +253,7 @@ export class DatabaseService {
       if (!user?.email) throw new Error('User not authenticated');
 
       const { data: vendor, error } = await supabaseClient
-        .from('pagepolly_ohxp1d_vendors')
+        .from('vendors_ohxp1d')
         .insert([{ 
           name, 
           url, 
@@ -274,7 +274,7 @@ export class DatabaseService {
   static async getVendors() {
     try {
       const { data: vendors, error } = await supabaseClient
-        .from('pagepolly_ohxp1d_vendors')
+        .from('vendors_ohxp1d')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -289,7 +289,7 @@ export class DatabaseService {
   static async updateVendor(id, updates) {
     try {
       const { data: vendor, error } = await supabaseClient
-        .from('pagepolly_ohxp1d_vendors')
+        .from('vendors_ohxp1d')
         .update(updates)
         .eq('id', id)
         .select()
@@ -306,7 +306,7 @@ export class DatabaseService {
   static async deleteVendor(id) {
     try {
       const { error } = await supabaseClient
-        .from('pagepolly_ohxp1d_vendors')
+        .from('vendors_ohxp1d')
         .delete()
         .eq('id', id);
 

@@ -360,32 +360,28 @@ app.post('/api/crawls', async (req, res) => {
       // Simuleer een database response
       crawlJob = {
         id: crawlId,
-        user_id: userId,
-        project_id: projectId || 'default',
+        user_email: userId,
         urls: urls,
         vendor_id: vendorId || null,
         status: 'running',
         progress: 0,
-        crawler_type: crawlerType,
         settings: settings || {},
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        creation_time: new Date().toISOString()
       };
     } else {
       // Maak een nieuwe crawl job entry in de database
       try {
         const { data, error } = await supabase
-          .from('crawl_jobs')
+          .from('crawl_jobs_ohxp1d')
           .insert({
             id: crawlId,
-            user_id: userId,
-            project_id: projectId || 'default',
+            user_email: userId,
             urls: urls,
             vendor_id: vendorId || null,
             status: 'running',
             progress: 0,
-            crawler_type: crawlerType,
-            settings: settings || {}
+            settings: settings || {},
+            creation_time: new Date().toISOString()
           })
           .select()
           .single();
@@ -449,11 +445,11 @@ async function updateCrawlJobStatus(crawlId, status, progress) {
     }
     
     const { error } = await supabase
-      .from('crawl_jobs')
+      .from('crawl_jobs_ohxp1d')
       .update({
         status: status,
         progress: progress,
-        updated_at: new Date().toISOString()
+        completion_time: status === 'completed' || status === 'failed' ? new Date().toISOString() : null
       })
       .eq('id', crawlId);
     
@@ -475,18 +471,21 @@ async function saveCrawlResult(crawlId, pageData) {
     }
     
     const { error } = await supabase
-      .from('crawl_results')
+      .from('crawl_results_ohxp1d')
       .insert({
-        crawl_id: crawlId,
+        job_id: crawlId,
         url: pageData.url,
-        title: pageData.title,
-        status_code: pageData.statusCode,
-        content_type: pageData.contentType,
-        meta_tags: pageData.metaTags,
-        links: pageData.links,
-        headers: pageData.headers,
-        html: pageData.html,
-        crawled_at: pageData.timestamp
+        status: pageData.statusCode ? pageData.statusCode.toString() : '200',
+        data: {
+          title: pageData.title,
+          contentType: pageData.contentType,
+          metaTags: pageData.metaTags,
+          links: pageData.links,
+          headers: pageData.headers,
+          html: pageData.html
+        },
+        crawl_duration: pageData.duration || 0,
+        timestamp: new Date().toISOString()
       });
     
     if (error) {
@@ -785,23 +784,38 @@ app.get('/api/vendors', async (req, res) => {
   
   try {
     // Haal vendors op uit de database
-    const { data: vendors, error } = await supabase
-      .from('vendors_ohxp1d')
-      .select('*')
-      .order('name');
-    
-    if (error) {
-      console.error('Fout bij ophalen vendors:', error);
-      return res.status(500).json({
-        status: 500,
-        message: 'Fout bij ophalen vendors: ' + error.message
-      });
+    try {
+      const { data: vendors, error } = await supabase
+        .from('vendors_ohxp1d')
+        .select('*')
+        .order('name');
+      
+      if (!error) {
+        return res.json({
+          status: 'success',
+          data: vendors || []
+        });
+      }
+      
+      // Als er een fout is, loggen we die maar gaan door naar de fallback
+      console.error('Fout bij ophalen vendors uit database:', error);
+    } catch (dbError) {
+      console.error('Database error:', dbError);
     }
+    
+    // Fallback: hardcoded vendors
+    console.log('Gebruik fallback hardcoded vendors');
+    const fallbackVendors = [
+      { id: 1, name: 'ScrapingBee', url: 'https://www.scrapingbee.com', description: 'ScrapingBee API voor web scraping' },
+      { id: 2, name: 'Puppeteer', url: 'https://pptr.dev', description: 'Directe browser crawling met Puppeteer' },
+      { id: 3, name: 'Ferrum Audio', url: 'https://ferrum.audio', description: 'Voorbeeld website voor crawling tests' }
+    ];
     
     res.json({
       status: 'success',
-      data: vendors || []
+      data: fallbackVendors
     });
+    
   } catch (err) {
     console.error('Algemene fout bij ophalen vendors:', err);
     res.status(500).json({

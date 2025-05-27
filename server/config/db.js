@@ -12,8 +12,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '../../.env') });
 
 // Check for required environment variables
-const SUPABASE_URL = process.env?.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env?.SUPABASE_ANON_KEY;
+const SUPABASE_URL = process.env?.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env?.VITE_SUPABASE_ANON_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
   console.error('Missing Supabase environment variables. Please check your .env file.');
@@ -548,36 +548,89 @@ const db = {
    */
   async createVendorsTable() {
     try {
-      // Maak de tabel direct aan met SQL
-      const { error: sqlError } = await supabase.rpc('exec_sql', {
-        sql_string: `
-          CREATE TABLE IF NOT EXISTS vendors_ohxp1d (
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL,
-            url TEXT NOT NULL,
-            description TEXT,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-          );
-          
-          -- Voeg enkele testvendors toe voor ontwikkeling
-          INSERT INTO vendors_ohxp1d (name, url, description, created_at)
-          VALUES 
-            ('ScrapingBee', 'https://www.scrapingbee.com', 'ScrapingBee API voor web scraping', NOW()),
-            ('Puppeteer', 'https://pptr.dev', 'Directe browser crawling met Puppeteer', NOW()),
-            ('Ferrum Audio', 'https://ferrum.audio', 'Voorbeeld website voor crawling tests', NOW())
-          ON CONFLICT DO NOTHING;
-        `
-      });
+      console.log('Aanmaken vendors_ohxp1d tabel...');
       
-      if (sqlError) {
-        console.error('Error creating vendors_ohxp1d table:', sqlError);
-        throw sqlError;
+      // Probeer eerst een query uit te voeren om te zien of de tabel bestaat
+      const { error: checkError } = await supabase
+        .from('vendors_ohxp1d')
+        .select('count(*)')
+        .limit(1);
+      
+      // Als de tabel niet bestaat, maken we deze aan
+      if (checkError && checkError.code === '42P01') {
+        console.log('Vendors tabel bestaat niet, wordt nu aangemaakt...');
+        
+        // Maak de tabel aan met een directe SQL query via de REST API
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          console.error('Error getting session:', error);
+          throw error;
+        }
+        
+        // Gebruik Postgres SQL via een POST request met de service role key
+        const response = await fetch(`${process.env.VITE_SUPABASE_URL}/rest/v1/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${process.env.VITE_SUPABASE_SERVICE_ROLE_KEY}`,
+            'apikey': process.env.VITE_SUPABASE_ANON_KEY,
+            'Prefer': 'resolution=merge-duplicates'
+          },
+          body: JSON.stringify({
+            query: `
+              CREATE TABLE IF NOT EXISTS public.vendors_ohxp1d (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                url TEXT NOT NULL,
+                description TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+              );
+              
+              -- Voeg enkele testvendors toe voor ontwikkeling
+              INSERT INTO public.vendors_ohxp1d (name, url, description)
+              VALUES 
+                ('ScrapingBee', 'https://www.scrapingbee.com', 'ScrapingBee API voor web scraping'),
+                ('Puppeteer', 'https://pptr.dev', 'Directe browser crawling met Puppeteer'),
+                ('Ferrum Audio', 'https://ferrum.audio', 'Voorbeeld website voor crawling tests')
+              ON CONFLICT DO NOTHING;
+            `
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('Error creating vendors_ohxp1d table:', errorData);
+          throw new Error(`Failed to create vendors_ohxp1d table: ${JSON.stringify(errorData)}`);
+        }
+        
+        console.log('vendors_ohxp1d tabel succesvol aangemaakt');
+      } else {
+        console.log('vendors_ohxp1d tabel bestaat al');
       }
-      
-      console.log('vendors_ohxp1d tabel succesvol aangemaakt of bestaat al');
     } catch (error) {
       console.error('Fout bij aanmaken vendors_ohxp1d tabel:', error);
-      throw error;
+      
+      // Als alternatief, laten we een fallback implementatie proberen
+      try {
+        // Implementeer een fallback door direct een insert te doen en te kijken of het werkt
+        const { error: insertError } = await supabase
+          .from('vendors_ohxp1d')
+          .insert([
+            { name: 'ScrapingBee', url: 'https://www.scrapingbee.com', description: 'ScrapingBee API voor web scraping' },
+            { name: 'Puppeteer', url: 'https://pptr.dev', description: 'Directe browser crawling met Puppeteer' },
+            { name: 'Ferrum Audio', url: 'https://ferrum.audio', description: 'Voorbeeld website voor crawling tests' }
+          ])
+          .select();
+        
+        if (!insertError) {
+          console.log('vendors_ohxp1d tabel bestaat en vendors toegevoegd');
+        } else {
+          throw insertError;
+        }
+      } catch (fallbackError) {
+        console.error('Fallback voor vendors_ohxp1d tabel mislukt:', fallbackError);
+        throw error; // Gooi de originele fout
+      }
     }
   },
   

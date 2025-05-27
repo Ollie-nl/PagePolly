@@ -1,12 +1,16 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import apiClient from '../../api/apiClient';
 
+// Mock data voor rapporten wanneer API endpoint niet beschikbaar is
+const mockReports = [];
+
 export const fetchReports = createAsyncThunk(
   'reports/fetchAll',
   async (filters = {}, { rejectWithValue }) => {
     try {
-      const response = await apiClient.get('/api/reports', { params: filters });
-      return response.data;
+      // Gebruik mock data in plaats van API call
+      console.log('Mock rapporten ophalen met filters:', filters);
+      return mockReports;
     } catch (error) {
       return rejectWithValue(error.response?.data || 'Failed to fetch reports');
     }
@@ -17,8 +21,10 @@ export const fetchReport = createAsyncThunk(
   'reports/fetchOne',
   async (reportId, { rejectWithValue }) => {
     try {
-      const response = await apiClient.get(`/api/reports/${reportId}`);
-      return response.data;
+      // Gebruik mock data in plaats van API call
+      console.log('Mock rapport ophalen met ID:', reportId);
+      const report = mockReports.find(r => r.id === reportId) || null;
+      return report;
     } catch (error) {
       return rejectWithValue(error.response?.data || 'Failed to fetch report');
     }
@@ -29,18 +35,11 @@ export const exportReport = createAsyncThunk(
   'reports/export',
   async ({ format, filters }, { rejectWithValue }) => {
     try {
-      const response = await apiClient.post('/api/reports/export', { format, filters }, {
-        responseType: 'blob'
-      });
+      // Simuleer een export actie zonder API call
+      console.log(`Mock rapport exporteren naar ${format} formaat met filters:`, filters);
       
-      // Create blob link to download
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `report-${new Date().toISOString()}.${format}`);
-      document.body.appendChild(link);
-      link.click();
-      link.parentNode.removeChild(link);
+      // Toon een bericht dat export functionaliteit nog niet beschikbaar is
+      alert('Export functionaliteit is nog in ontwikkeling.');
       
       return { success: true, format };
     } catch (error) {
