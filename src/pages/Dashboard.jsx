@@ -34,11 +34,13 @@ function Dashboard() {
   useEffect(() => {
     if (vendors.length > 0) {
       // Calculate basic stats based on vendors and crawl data
-      const completedJobs = history.filter(job => job.status === 'completed');
+      const completedJobs = Array.isArray(history) 
+        ? history.filter(job => job.status === 'completed') 
+        : [];
       setStats({
         totalVendors: vendors.length,
         crawledVendors: completedJobs.length > 0 ? Math.min(vendors.length, completedJobs.length) : 0,
-        totalCrawls: history.length,
+        totalCrawls: Array.isArray(history) ? history.length : 0,
         completedCrawls: completedJobs.length,
         // Mock data for now
         averageResponseTime: 245,
