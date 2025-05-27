@@ -257,8 +257,7 @@ export class DatabaseService {
         .insert([{ 
           name, 
           url, 
-          description,
-          user_email: user.email
+          description
         }])
         .select()
         .single();
