@@ -11,6 +11,14 @@ class PuppeteerCrawlerAPI {
    * @returns {Promise<Object>} - Headers object with authorization
    */
   async getAuthHeaders() {
+    // Tijdelijk authenticatie overslaan voor ontwikkeling
+    if (import.meta.env.DEV) {
+      console.log('Ontwikkelingsmodus: authenticatie wordt overgeslagen');
+      return {
+        'Content-Type': 'application/json'
+      };
+    }
+
     const { data } = await supabase.auth.getSession();
     const session = data.session;
     

@@ -1,6 +1,7 @@
 {
   "name": "pagepolly-server",
   "version": "1.0.0",
+  "type": "module",
   "description": "PagePolly web crawler backend service",
   "main": "index.js",
   "scripts": {

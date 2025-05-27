@@ -27,7 +27,6 @@ const CrawlButton = ({ vendorId, onCrawlComplete }) => {
   const [puppeteerSettings, setPuppeteerSettings] = useState({
     simulateHumanBehavior: true,
     useProxy: false,
-    takeScreenshots: true,
     maxRetries: 3,
     waitTime: 2000,
   });
@@ -67,7 +66,12 @@ const CrawlButton = ({ vendorId, onCrawlComplete }) => {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        try {
+          const errorData = await response.json();
+          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        } catch (jsonError) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
       }
 
       const data = await response.json();

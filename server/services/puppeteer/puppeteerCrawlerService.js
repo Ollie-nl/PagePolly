@@ -65,13 +65,13 @@ class PuppeteerCrawlerService {
     try {
       // Update job status to running
       console.log(`Updating job ${jobId} status to 'running'`);
-await db.updateCrawlJob(jobId, { status: 'running' });
+      await db.updateCrawlJob(jobId, { status: 'running' });
 
       // Get browser instance
       console.log('Attempting to get Puppeteer browser instance');
-browser = const browser = await this.puppeteerManager.getBrowser();
-console.log('Browser instance details:', JSON.stringify(browser));
-console.log('Puppeteer browser instance acquired');
+      browser = await this.puppeteerManager.getBrowser();
+      console.log('Browser instance details:', JSON.stringify(browser));
+      console.log('Puppeteer browser instance acquired');
       
       const totalUrls = urls.length;
       let completedUrls = 0;
@@ -96,7 +96,7 @@ console.log('Puppeteer browser instance acquired');
         completedUrls++;
         const progress = Math.round((completedUrls / totalUrls) * 100);
         console.log(`Updating job ${jobId} progress to ${progress}%`);
-await db.updateCrawlJob(jobId, { progress });
+        await db.updateCrawlJob(jobId, { progress });
       }
 
       // Update final status
@@ -107,9 +107,9 @@ await db.updateCrawlJob(jobId, { progress });
 
     } catch (error) {
       console.error(`Job ${jobId} failed:`, error);
-console.error('Error stack trace:', error.stack);
-console.error('Request headers:', JSON.stringify(browser.requestHeaders));
-console.error('Response headers:', JSON.stringify(browser.responseHeaders));
+      console.error('Error stack trace:', error.stack);
+      console.error('Request headers:', JSON.stringify(browser.requestHeaders));
+      console.error('Response headers:', JSON.stringify(browser.responseHeaders));
       await db.updateCrawlJob(jobId, {
         status: 'failed',
         error: error.message,

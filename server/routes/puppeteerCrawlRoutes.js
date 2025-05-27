@@ -1,6 +1,6 @@
 // server/routes/puppeteerCrawlRoutes.js
 import express from 'express';
-import { authenticateToken } from '../middleware/auth.js';
+import authenticateToken from '../middleware/auth.js';
 import { validateCrawlRequest, validateJobId, validatePaginationParams } from '../middleware/validators.js';
 import PuppeteerCrawlerService from '../services/puppeteer/puppeteerCrawlerService.js';
 import puppeteerManager from '../services/puppeteer/puppeteerManager.js';

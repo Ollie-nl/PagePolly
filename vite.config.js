@@ -11,7 +11,9 @@ export default defineConfig({
     port: 5175,
     proxy: {
       '/api': {
-        target: 'https://pagepolly-server-u0ndvd-e75ef-fb9511.mgx.dev',
+        // Oorspronkelijke target was: 'https://pagepolly-server-u0ndvd-e75ef-fb9511.mgx.dev'
+        // Gewijzigd naar lokale ontwikkelserver voor debuggen
+        target: 'http://localhost:4000',
         changeOrigin: true,
         secure: false,
         ws: true

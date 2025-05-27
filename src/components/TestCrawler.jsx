@@ -20,7 +20,7 @@ import {
 import { useSelector } from 'react-redux';
 import PuppeteerCrawlOption from './PuppeteerCrawlOption';
 import supabaseClient from '../lib/supabaseClient';
-import { crawlerClient } from '../api/crawlerApi';
+import { crawlerClient, healthCheck, testCrawl } from '../api/crawlerApi';
 import LinkIcon from '@mui/icons-material/Link';
 
 const TestCrawler = () => {
@@ -34,7 +34,6 @@ const TestCrawler = () => {
   const [puppeteerSettings, setPuppeteerSettings] = useState({
     simulateHumanBehavior: true,
     useProxy: false,
-    takeScreenshots: true,
     maxRetries: 3,
     waitTime: 2000,
   });
@@ -70,17 +69,17 @@ const TestCrawler = () => {
 
     try {
       // First check if services are healthy
-      const healthCheck = await crawlerClient.get('/api/health');
+      const healthCheckResponse = await healthCheck();
       
-      if (!healthCheck.data.success) {
-        if (healthCheck.data.services?.puppeteer?.status === 'degraded') {
+      if (!healthCheckResponse.success) {
+        if (healthCheckResponse.data?.services?.puppeteer?.status === 'degraded') {
           throw new Error('Crawler service is temporarily degraded. Please try again in a few moments.');
         }
-        throw new Error(healthCheck.data.message || 'Service health check failed');
+        throw new Error(healthCheckResponse.message || 'Service health check failed');
       }
       
-      if (healthCheck.data.services?.puppeteer?.metrics?.responseTime > 5000) {
-        console.warn('Crawler service response time is high:', healthCheck.data.services.puppeteer.metrics.responseTime);
+      if (healthCheckResponse.data?.services?.puppeteer?.metrics?.responseTime > 5000) {
+        console.warn('Crawler service response time is high:', healthCheckResponse.data.services.puppeteer.metrics.responseTime);
       }
 
       const { data: { user } } = await supabaseClient.auth.getUser();
@@ -102,8 +101,8 @@ const TestCrawler = () => {
       };
 
       try {
-        // Use crawlerClient with retry logic
-        const response = await crawlerClient.post('/api/crawls/test', payload, {
+        // Gebruik de nieuwe testCrawl functie in plaats van crawlerClient.post
+        const testResponse = await testCrawl(payload, {
           headers: {
             'Authorization': `Bearer ${session.access_token}`
           },
@@ -115,7 +114,11 @@ const TestCrawler = () => {
           }
         });
 
-        setResult(response.data);
+        if (!testResponse.success) {
+          throw new Error(testResponse.message || 'Test crawl failed');
+        }
+
+        setResult(testResponse.data);
         setStatus('completed');
         setProgress(100);
       } catch (error) {
@@ -215,19 +218,6 @@ const TestCrawler = () => {
                 Test Results
               </Typography>
               
-              {result.screenshot && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>
-                    Screenshot:
-                  </Typography>
-                  <img 
-                    src={result.screenshot} 
-                    alt="Page Screenshot" 
-                    style={{ maxWidth: '100%', height: 'auto' }}
-                  />
-                </Box>
-              )}
-
               <Typography variant="subtitle2" gutterBottom>
                 Page Data:
               </Typography>

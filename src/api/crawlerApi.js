@@ -12,7 +12,7 @@ import axiosRetry from 'axios-retry';
 const crawlerClient = axios.create({
   // Use environment variable if available, otherwise use relative paths
   // which will resolve against the current domain (important for deployment)
-  baseURL: import.meta.env.VITE_CRAWLER_API_URL || '',  // Empty string means use relative URLs
+  baseURL: import.meta.env.VITE_CRAWLER_API_URL || '/api/crawls',  // Set the baseURL to /api/crawls
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json'
@@ -66,6 +66,15 @@ crawlerClient.interceptors.request.use(config => {
   return Promise.reject(error);
 });
 
+// Voeg request interceptor toe voor debugging
+crawlerClient.interceptors.request.use(
+  config => {
+    console.log(`[DEBUG] API aanroep naar: ${config.method.toUpperCase()} ${config.baseURL || ''}${config.url}`);
+    return config;
+  },
+  error => Promise.reject(error)
+);
+
 // Add response interceptor for error handling
 crawlerClient.interceptors.response.use(
   response => response,
@@ -78,7 +87,9 @@ crawlerClient.interceptors.response.use(
   }
 );
 
-const BASE_ENDPOINT = '/api/crawls';
+// Direct paden gebruiken zonder /api/crawls prefix (dat wordt al toegevoegd via baseURL)
+export const CRAWLS_ENDPOINT = '';  // Leeg omdat baseURL al '/api/crawls' is
+export const CRAWLS_STATUS_ENDPOINT = '/status';  // Alleen '/status' toevoegen aan baseURL
 
 /**
  * Normalize API response
@@ -88,6 +99,35 @@ const normalizeResponse = (response) => ({
   data: response.data,
   message: 'Operation successful'
 });
+
+/**
+ * Health check functie die een aangepaste URL gebruikt om problemen met baseURL te voorkomen
+ */
+export const healthCheck = async () => {
+  try {
+    // Gebruik axios direct, niet de crawlerClient instantie met baseURL
+    const response = await axios.get('/api/health');
+    return normalizeResponse(response);
+  } catch (error) {
+    return handleError(error, 'checking service health');
+  }
+};
+
+/**
+ * Test crawl functie die een aangepaste URL gebruikt om problemen met baseURL te voorkomen
+ * @param {Object} payload - De test crawl configuratie
+ * @param {Object} options - Optionele configuratie voor de request
+ * @returns {Promise<Object>} - Test crawl response
+ */
+export const testCrawl = async (payload, options = {}) => {
+  try {
+    // Gebruik axios direct, niet de crawlerClient instantie met baseURL
+    const response = await axios.post('/api/crawls/test', payload, options);
+    return normalizeResponse(response);
+  } catch (error) {
+    return handleError(error, 'performing test crawl');
+  }
+};
 
 /**
  * Handle API errors
@@ -120,22 +160,28 @@ const handleError = (error, operation) => {
  */
 export const startCrawlJob = async (data) => {
   try {
-    // Ensure API key is present and clean it
-    if (!data.api_key) {
-      console.log('WARNING: No API key provided for crawl job!');
-      throw new Error('API key is required to start a crawl job');
+    // Voor test-endpoints slaan we de API key validatie over
+    if (CRAWLS_ENDPOINT === '/api/test-crawls') {
+      console.log('Gebruik van test-endpoint, API key validatie overgeslagen');
+      data.api_key = 'test-api-key'; // Dummy API key voor test-endpoints
+    } else {
+      // Normale API key validatie voor echte endpoints
+      if (!data.api_key) {
+        console.log('WARNING: No API key provided for crawl job!');
+        throw new Error('API key is required to start a crawl job');
+      }
+      
+      // Clean the API key by removing whitespace
+      data.api_key = data.api_key.trim();
+      
+      if (!data.api_key) {
+        throw new Error('API key cannot be empty');
+      }
+      
+      console.log('Starting crawl job with API key present (masked):', '****' + data.api_key.substring(data.api_key.length - 4));
     }
     
-    // Clean the API key by removing whitespace
-    data.api_key = data.api_key.trim();
-    
-    if (!data.api_key) {
-      throw new Error('API key cannot be empty');
-    }
-    
-    console.log('Starting crawl job with API key present (masked):', '****' + data.api_key.substring(data.api_key.length - 4));
-    
-    const response = await crawlerClient.post(BASE_ENDPOINT, data);
+    const response = await crawlerClient.post(CRAWLS_ENDPOINT, data);
     return normalizeResponse(response);
   } catch (error) {
     return handleError(error, 'starting crawl job');
@@ -150,7 +196,7 @@ export const startCrawlJob = async (data) => {
  */
 export const getCrawlJobDetails = async (jobId) => {
   try {
-    const response = await crawlerClient.get(`${BASE_ENDPOINT}/${jobId}`);
+    const response = await crawlerClient.get(`${CRAWLS_ENDPOINT}/${jobId}`);
     return normalizeResponse(response);
   } catch (error) {
     return handleError(error, `getting details for job ${jobId}`);
@@ -164,7 +210,7 @@ export const getCrawlJobDetails = async (jobId) => {
  */
 export const getActiveCrawlJobs = async () => {
   try {
-    const response = await crawlerClient.get(`${BASE_ENDPOINT}/status`);
+    const response = await crawlerClient.get(CRAWLS_STATUS_ENDPOINT);
     return normalizeResponse(response);
   } catch (error) {
     // Return empty array for 404 errors since it might mean no active jobs
@@ -191,7 +237,7 @@ export const getActiveCrawlJobs = async () => {
  */
 export const getCrawlHistory = async (params = {}) => {
   try {
-    const response = await crawlerClient.get(BASE_ENDPOINT, { params });
+    const response = await crawlerClient.get(CRAWLS_ENDPOINT, { params });
     return normalizeResponse(response);
   } catch (error) {
     // Return empty array for 404 errors
@@ -214,7 +260,7 @@ export const getCrawlHistory = async (params = {}) => {
  */
 export const cancelCrawlJob = async (jobId) => {
   try {
-    const response = await crawlerClient.post(`${BASE_ENDPOINT}/${jobId}/cancel`);
+    const response = await crawlerClient.post(`${CRAWLS_ENDPOINT}/${jobId}/cancel`);
     return normalizeResponse(response);
   } catch (error) {
     return handleError(error, `cancelling job ${jobId}`);
@@ -232,5 +278,7 @@ export default {
   getCrawlJobDetails,
   getActiveCrawlJobs,
   getCrawlHistory,
-  cancelCrawlJob
+  cancelCrawlJob,
+  healthCheck,
+  testCrawl
 };

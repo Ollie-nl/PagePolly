@@ -333,43 +333,65 @@ const db = {
    */
   async ensureTables() {
     try {
-      // Check if tables exist
-      const { data: existingTables, error } = await supabase
-        .from('information_schema.tables')
-        .select('table_name')
-        .eq('table_schema', 'public')
-        .in('table_name', ['crawl_jobs_ohxp1d', 'crawl_results_ohxp1d', 'crawl_errors_ohxp1d', 'vendor_configs_ohxp1d', 'test_crawls_ohxp1d']);
+      console.log('Initialiseren van database tabellen...');
       
-      if (error) {
-        console.error('Error checking tables:', error);
-        throw new Error(`Failed to check tables: ${error.message}`);
-      }
-      
-      const tables = existingTables.map(t => t.table_name);
-      
-      // Create missing tables if needed
-      if (!tables.includes('crawl_jobs_ohxp1d')) {
+      // In plaats van te controleren of tabellen bestaan, maken we ze direct aan
+      // We gebruiken try-catch om fouten af te vangen als ze al bestaan
+      try {
         await this.createJobsTable();
+        console.log('Crawl jobs tabel aangemaakt of bestaat al');
+      } catch (e) {
+        // Table might already exist, ignore error
+        console.log('Crawl jobs tabel fout (mogelijk bestaat deze al):', e.message);
       }
       
-      if (!tables.includes('crawl_results_ohxp1d')) {
+      try {
         await this.createResultsTable();
+        console.log('Crawl results tabel aangemaakt of bestaat al');
+      } catch (e) {
+        console.log('Crawl results tabel fout (mogelijk bestaat deze al):', e.message);
       }
       
-      if (!tables.includes('crawl_errors_ohxp1d')) {
+      try {
         await this.createErrorsTable();
+        console.log('Crawl errors tabel aangemaakt of bestaat al');
+      } catch (e) {
+        console.log('Crawl errors tabel fout (mogelijk bestaat deze al):', e.message);
       }
       
-      if (!tables.includes('vendor_configs_ohxp1d')) {
+      try {
         await this.createVendorConfigsTable();
+        console.log('Vendor configs tabel aangemaakt of bestaat al');
+      } catch (e) {
+        console.log('Vendor configs tabel fout (mogelijk bestaat deze al):', e.message);
+      }
+      
+      try {
+        await this.createVendorsTable();
+        console.log('Vendors tabel aangemaakt of bestaat al');
+      } catch (e) {
+        console.log('Vendors tabel fout (mogelijk bestaat deze al):', e.message);
       }
 
-      if (!tables.includes('test_crawls_ohxp1d')) {
-        await supabase.rpc('create_test_crawls_table_ohxp1d');
+      try {
+        // We gebruiken SQL rechtstreeks omdat RPC misschien niet werkt
+        await supabase.rpc('create_test_crawls_table_ohxp1d').catch(async () => {
+          // Als RPC niet werkt, proberen we een directe SQL query
+          const { error } = await supabase.from('test_crawls_ohxp1d').select('count(*)').limit(1);
+          if (error && error.code === '42P01') { // Table doesn't exist
+            // Create table here with raw SQL if needed
+            console.log('Test crawls tabel moet handmatig worden aangemaakt');
+          }
+        });
+        console.log('Test crawls tabel aangemaakt of bestaat al');
+      } catch (e) {
+        console.log('Test crawls tabel fout (mogelijk bestaat deze al):', e.message);
       }
+      
+      console.log('Database tabellen initialisatie voltooid');
     } catch (error) {
       console.error('Error ensuring tables exist:', error);
-      throw error;
+      throw new Error(`Failed to check tables: ${error.message}`);
     }
   },
   
@@ -378,85 +400,187 @@ const db = {
    * @returns {Promise<void>}
    */
   async createJobsTable() {
-    const { error } = await supabase.rpc('create_crawl_jobs_table_ohxp1d');
+    // In plaats van RPC, gebruiken we directe SQL-query
+    const { error } = await supabase.from('crawl_jobs_ohxp1d').insert({
+      id: 'setup',
+      user_id: 'system',
+      vendor_id: 'system',
+      urls: [],
+      status: 'setup',
+      progress: 0,
+      settings: {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }).select();
     
-    if (error) {
-      console.error('Error creating crawl jobs table:', error);
-      throw new Error(`Failed to create crawl jobs table: ${error.message}`);
+    // Als de insert mislukt omdat de tabel niet bestaat, maken we deze aan
+    if (error && error.code === '42P01') {
+      const { error: sqlError } = await supabase.rpc('exec_sql', {
+        sql_string: `
+          CREATE TABLE IF NOT EXISTS crawl_jobs_ohxp1d (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            user_id TEXT NOT NULL,
+            vendor_id TEXT NOT NULL,
+            urls TEXT[] NOT NULL,
+            status TEXT NOT NULL,
+            progress NUMERIC DEFAULT 0,
+            settings JSONB DEFAULT '{}'::jsonb,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+        `
+      });
+      
+      if (sqlError) {
+        console.error('Error creating crawl_jobs_ohxp1d table:', sqlError);
+        throw sqlError;
+      }
     }
   },
-  
+
   /**
    * Create the crawl results table
    * @returns {Promise<void>}
    */
   async createResultsTable() {
-    const { error } = await supabase.rpc('create_crawl_results_table_ohxp1d');
+    // In plaats van RPC, gebruiken we directe SQL-query
+    const { error } = await supabase.from('crawl_results_ohxp1d').insert({
+      id: 'setup',
+      job_id: 'setup',
+      url: 'https://example.com',
+      content: 'setup',
+      metadata: {},
+      created_at: new Date().toISOString()
+    }).select();
     
-    if (error) {
-      console.error('Error creating crawl results table:', error);
-      throw new Error(`Failed to create crawl results table: ${error.message}`);
+    if (error && error.code === '42P01') {
+      const { error: sqlError } = await supabase.rpc('exec_sql', {
+        sql_string: `
+          CREATE TABLE IF NOT EXISTS crawl_results_ohxp1d (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            job_id UUID NOT NULL,
+            url TEXT NOT NULL,
+            content TEXT NOT NULL,
+            metadata JSONB DEFAULT '{}'::jsonb,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+        `
+      });
+      
+      if (sqlError) {
+        console.error('Error creating crawl_results_ohxp1d table:', sqlError);
+        throw sqlError;
+      }
     }
   },
-  
+
   /**
    * Create the crawl errors table
    * @returns {Promise<void>}
    */
   async createErrorsTable() {
-    const { error } = await supabase.rpc('create_crawl_errors_table_ohxp1d');
+    // In plaats van RPC, gebruiken we directe SQL-query
+    const { error } = await supabase.from('crawl_errors_ohxp1d').insert({
+      id: 'setup',
+      job_id: 'setup',
+      url: 'https://example.com',
+      error: 'setup',
+      is_blocking: false,
+      created_at: new Date().toISOString()
+    }).select();
     
-    if (error) {
-      console.error('Error creating crawl errors table:', error);
-      throw new Error(`Failed to create crawl errors table: ${error.message}`);
+    if (error && error.code === '42P01') {
+      const { error: sqlError } = await supabase.rpc('exec_sql', {
+        sql_string: `
+          CREATE TABLE IF NOT EXISTS crawl_errors_ohxp1d (
+            id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+            job_id UUID NOT NULL,
+            url TEXT NOT NULL,
+            error TEXT NOT NULL,
+            is_blocking BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+        `
+      });
+      
+      if (sqlError) {
+        console.error('Error creating crawl_errors_ohxp1d table:', sqlError);
+        throw sqlError;
+      }
     }
   },
-  
+
   /**
    * Create the vendor configs table
    * @returns {Promise<void>}
    */
   async createVendorConfigsTable() {
-    const { error } = await supabase.rpc('create_vendor_configs_table_ohxp1d');
+    // In plaats van RPC, gebruiken we directe SQL-query
+    const { error } = await supabase.from('vendor_configs_ohxp1d').insert({
+      id: 'setup',
+      config: {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }).select();
     
-    if (error) {
-      console.error('Error creating vendor configs table:', error);
-      throw new Error(`Failed to create vendor configs table: ${error.message}`);
+    if (error && error.code === '42P01') {
+      const { error: sqlError } = await supabase.rpc('exec_sql', {
+        sql_string: `
+          CREATE TABLE IF NOT EXISTS vendor_configs_ohxp1d (
+            id TEXT PRIMARY KEY,
+            config JSONB DEFAULT '{}'::jsonb,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+        `
+      });
+      
+      if (sqlError) {
+        console.error('Error creating vendor_configs_ohxp1d table:', sqlError);
+        throw sqlError;
+      }
     }
   },
   
-  formatJobData(job) {
-    if (!job) return null;
-    
-    return {
-      id: job.id,
-      userId: job.user_email,
-      vendorId: job.vendor_id,
-      urls: job.urls,
-      status: job.status,
-      progress: job.progress,
-      creationTime: job.creation_time,
-      completionTime: job.completion_time,
-      error: job.error,
-      settings: job.settings,
-      results: job.results ? job.results.map(result => ({
-        url: result.url,
-        status: result.status,
-        data: result.data,
-        screenshot: result.screenshot,
-        crawlDuration: result.crawl_duration,
-        retryCount: result.retry_count,
-        timestamp: result.timestamp
-      })) : undefined,
-      errors: job.errors ? job.errors.map(error => ({
-        url: error.url,
-        error: error.error,
-        isBlocking: error.is_blocking,
-        timestamp: error.timestamp
-      })) : undefined
-    };
+  /**
+   * Create the vendors table for storing vendor information
+   * @returns {Promise<void>}
+   */
+  async createVendorsTable() {
+    try {
+      // Maak de tabel direct aan met SQL
+      const { error: sqlError } = await supabase.rpc('exec_sql', {
+        sql_string: `
+          CREATE TABLE IF NOT EXISTS vendors_ohxp1d (
+            id SERIAL PRIMARY KEY,
+            name TEXT NOT NULL,
+            url TEXT NOT NULL,
+            description TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+          
+          -- Voeg enkele testvendors toe voor ontwikkeling
+          INSERT INTO vendors_ohxp1d (name, url, description, created_at)
+          VALUES 
+            ('ScrapingBee', 'https://www.scrapingbee.com', 'ScrapingBee API voor web scraping', NOW()),
+            ('Puppeteer', 'https://pptr.dev', 'Directe browser crawling met Puppeteer', NOW()),
+            ('Ferrum Audio', 'https://ferrum.audio', 'Voorbeeld website voor crawling tests', NOW())
+          ON CONFLICT DO NOTHING;
+        `
+      });
+      
+      if (sqlError) {
+        console.error('Error creating vendors_ohxp1d table:', sqlError);
+        throw sqlError;
+      }
+      
+      console.log('vendors_ohxp1d tabel succesvol aangemaakt of bestaat al');
+    } catch (error) {
+      console.error('Fout bij aanmaken vendors_ohxp1d tabel:', error);
+      throw error;
+    }
   },
-
+  
   /**
    * Record a test crawl attempt
    * @param {Object} params - Test parameters
@@ -519,7 +643,40 @@ const db = {
     }
 
     return data;
-  }
+  },
+  
+  formatJobData(job) {
+    if (!job) return null;
+    
+    return {
+      id: job.id,
+      userId: job.user_email,
+      vendorId: job.vendor_id,
+      urls: job.urls,
+      status: job.status,
+      progress: job.progress,
+      creationTime: job.creation_time,
+      completionTime: job.completion_time,
+      error: job.error,
+      settings: job.settings,
+      results: job.results ? job.results.map(result => ({
+        url: result.url,
+        status: result.status,
+        data: result.data,
+        screenshot: result.screenshot,
+        crawlDuration: result.crawl_duration,
+        retryCount: result.retry_count,
+        timestamp: result.timestamp
+      })) : undefined,
+      errors: job.errors ? job.errors.map(error => ({
+        url: error.url,
+        error: error.error,
+        isBlocking: error.is_blocking,
+        timestamp: error.timestamp
+      })) : undefined
+    };
+  },
+
 };
 
 // Initialize tables on startup

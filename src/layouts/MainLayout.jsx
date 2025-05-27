@@ -70,7 +70,6 @@ const MainLayout = () => {
       <List>
         {menuItems.map((item) => (
           <ListItem
-            button
             key={item.text}
             component={NavLink}
             to={item.path}
@@ -87,7 +86,7 @@ const MainLayout = () => {
       </List>
       <Divider />
       <List>
-        <ListItem button onClick={handleLogout}>
+        <ListItem onClick={handleLogout}>
           <ListItemIcon>
             <LogoutIcon />
           </ListItemIcon>
