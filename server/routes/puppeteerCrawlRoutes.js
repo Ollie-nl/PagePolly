@@ -89,6 +89,70 @@ router.get('/status/:sessionId', async (req, res) => {
   }
 });
 
+// Haal alle actieve crawl jobs op
+router.get('/active', async (req, res) => {
+  try {
+    console.log('Ophalen van actieve crawl jobs');
+    
+    // Controleer of de service en de methode bestaan
+    if (!puppeteerCrawlerService || typeof puppeteerCrawlerService.getActiveCrawls !== 'function') {
+      console.error('puppeteerCrawlerService.getActiveCrawls is niet beschikbaar');
+      return res.status(500).json({
+        success: false,
+        message: 'Interne serverfout: Crawler service niet beschikbaar'
+      });
+    }
+    
+    // Haal actieve crawls op via de service
+    const activeCrawls = await puppeteerCrawlerService.getActiveCrawls();
+    console.log(`${activeCrawls.length} actieve crawl jobs gevonden`);
+    
+    // Zorg ervoor dat we altijd een array hebben, zelfs als de service null of undefined teruggeeft
+    const safeActiveCrawls = Array.isArray(activeCrawls) ? activeCrawls : [];
+    
+    // Controleer of elke entry in de array een geldig object is
+    const sanitizedCrawls = safeActiveCrawls.map(crawl => {
+      // Als crawl geen object is, return een leeg object
+      if (!crawl || typeof crawl !== 'object') {
+        console.warn('Ongeldige crawl data gevonden:', crawl);
+        return {};
+      }
+      
+      try {
+        // Zorg ervoor dat alle date objecten als strings worden weergegeven
+        const sanitized = { ...crawl };
+        if (sanitized.startTime instanceof Date) {
+          sanitized.startTime = sanitized.startTime.toISOString();
+        }
+        
+        // Converteer Set objecten naar arrays
+        if (sanitized.recentUrls && sanitized.recentUrls instanceof Set) {
+          sanitized.recentUrls = Array.from(sanitized.recentUrls);
+        }
+        
+        return sanitized;
+      } catch (err) {
+        console.error('Fout bij sanitizen van crawl data:', err);
+        return {};
+      }
+    });
+    
+    // Verstuur het resultaat als JSON
+    res.setHeader('Content-Type', 'application/json');
+    res.json({
+      success: true,
+      data: sanitizedCrawls
+    });
+  } catch (error) {
+    console.error('Fout bij ophalen van actieve crawl jobs:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Er is een fout opgetreden bij het ophalen van actieve crawl jobs',
+      error: error.message
+    });
+  }
+});
+
 // Stop een actieve crawl
 router.post('/stop/:sessionId', async (req, res) => {
   try {

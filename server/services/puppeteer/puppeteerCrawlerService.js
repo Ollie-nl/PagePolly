@@ -324,6 +324,64 @@ class PuppeteerCrawlerService {
     return this.activeCrawls.get(sessionId) || { status: 'not_found' };
   }
 
+  /**
+   * Haalt alle actieve crawl jobs op met gedetailleerde informatie
+   * @returns {Array} Array met alle actieve crawl jobs en hun status
+   */
+  async getActiveCrawls() {
+    const activeCrawls = [];
+    
+    // Converteer de Map naar een array met gedetailleerde informatie
+    for (const [sessionId, crawlState] of this.activeCrawls.entries()) {
+      // Skip voltooide of mislukte crawls
+      if (crawlState.status === 'completed' || crawlState.status === 'failed') {
+        continue;
+      }
+      
+      // Bereken de duur van de huidige crawl
+      const currentDuration = Math.round((new Date() - crawlState.startTime) / 1000);
+      
+      // Verzamel de top 5 meest recent bezochte URLs
+      const recentUrls = Array.from(crawlState.visitedUrls).slice(-5).reverse();
+      
+      // Bereken gemiddelde verwerkingstijd per pagina, indien beschikbaar
+      const avgProcessingTime = crawlState.pagesCrawled > 0 
+        ? currentDuration / crawlState.pagesCrawled 
+        : 0;
+      
+      activeCrawls.push({
+        sessionId,
+        vendorId: crawlState.vendorId,
+        userId: crawlState.userId,
+        status: crawlState.status,
+        progress: crawlState.progress || 0,
+        startTime: crawlState.startTime,
+        pagesCrawled: crawlState.pagesCrawled || 0,
+        maxPages: crawlState.maxPages,
+        currentDepth: crawlState.currentDepth || 0,
+        maxDepth: crawlState.maxDepth,
+        errors: crawlState.errors.length,
+        // Extra interessante informatie
+        duration: currentDuration,
+        avgProcessingTime: avgProcessingTime.toFixed(2),
+        recentUrls,
+        currentUrl: crawlState.currentUrl || null,
+        // Voeg start URLs en stealth mode toe
+        startUrls: crawlState.startUrls || [],
+        stealthMode: crawlState.stealthMode || false,
+        // Statistieken over gevonden content
+        statistics: {
+          totalLinks: crawlState.stats?.totalLinks || 0,
+          uniqueLinks: crawlState.stats?.uniqueLinks || 0,
+          internalLinks: crawlState.stats?.internalLinks || 0,
+          externalLinks: crawlState.stats?.externalLinks || 0
+        }
+      });
+    }
+    
+    return activeCrawls;
+  }
+
   async stopCrawl(sessionId) {
     const crawlState = this.activeCrawls.get(sessionId);
     if (crawlState) {

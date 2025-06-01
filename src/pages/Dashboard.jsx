@@ -24,7 +24,8 @@ import { nl } from 'date-fns/locale';
 function Dashboard() {
   const dispatch = useDispatch();
   const { items: vendors = [] } = useSelector((state) => state.vendors || {});
-  const { activeJob = null, history = [] } = useSelector((state) => state.crawls || {});
+  const { activeCrawls = [], history = [] } = useSelector((state) => state.crawls || {});
+  console.log('Dashboard: activeCrawls uit Redux store:', activeCrawls);
   const [stats, setStats] = useState({
     totalVendors: 0,
     crawledVendors: 0,
@@ -85,35 +86,34 @@ function Dashboard() {
     }
   }, [vendors, history]);
   
-  // Helper functie om status label te genereren
-  const getStatusChip = (status) => {
-    switch(status) {
-      case 'completed':
-        return <Chip label="Voltooid" color="success" size="small" />;
-      case 'failed':
-        return <Chip label="Mislukt" color="error" size="small" />;
-      case 'running':
-        return <Chip label="Actief" color="primary" size="small" />;
-      case 'queued':
-        return <Chip label="Wachtrij" color="warning" size="small" />;
-      case 'cancelled':
-        return <Chip label="Geannuleerd" color="default" size="small" />;
-      default:
-        return <Chip label={status} size="small" />;
-    }
-  };
-
-  // Helper functie om datum relatief weer te geven
+  // Hulpfuncties voor formatteren
   const formatRelativeDate = (dateString) => {
     if (!dateString) return 'Onbekend';
-    try {
-      return formatDistance(new Date(dateString), new Date(), { 
-        addSuffix: true,
-        locale: nl
-      });
-    } catch (error) {
-      return dateString;
-    }
+    const date = new Date(dateString);
+    return formatDistance(date, new Date(), { addSuffix: true, locale: nl });
+  };
+
+  // Helper functie voor het formatteren van status chips met juiste kleuren
+  const getStatusChip = (status) => {
+    const statusConfig = {
+      'pending': { label: 'In afwachting', color: 'default' },
+      'running': { label: 'Actief', color: 'primary' },
+      'completed': { label: 'Voltooid', color: 'success' },
+      'failed': { label: 'Mislukt', color: 'error' },
+      'stopped': { label: 'Gestopt', color: 'warning' }
+    };
+    
+    const config = statusConfig[status] || { label: status, color: 'default' };
+    
+    return (
+      <Chip 
+        label={config.label} 
+        color={config.color} 
+        size="small" 
+        variant="outlined"
+        sx={{ fontWeight: 500 }}
+      />
+    );
   };
 
   return (
@@ -176,41 +176,132 @@ function Dashboard() {
 
       {/* Actieve Crawl Jobs */}
       <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>Actieve Crawl Jobs</Typography>
-      {activeJob ? (
-        <Card sx={{ mb: 4 }}>
-          <CardContent>
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <Typography variant="subtitle1">Vendor: {activeJob.vendorName || 'Onbekend'}</Typography>
-                <Typography variant="body2" color="textSecondary">
-                  Gestart: {formatRelativeDate(activeJob.startTime)}
-                </Typography>
-                <Typography variant="body2" color="textSecondary">
-                  Pagina's verwerkt: {activeJob.stats?.pagesProcessed || 0}
-                </Typography>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography variant="body2" color="textSecondary" gutterBottom>
-                  Voortgang: {activeJob.progress ? `${Math.round(activeJob.progress * 100)}%` : 'Bezig...'}
-                </Typography>
-                <LinearProgress 
-                  variant={activeJob.progress ? "determinate" : "indeterminate"} 
-                  value={activeJob.progress ? activeJob.progress * 100 : 0} 
-                  sx={{ mt: 1 }}
-                />
-                {activeJob.status && (
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
-                    {getStatusChip(activeJob.status)}
+      {Array.isArray(activeCrawls) && activeCrawls.length > 0 ? (
+        activeCrawls.map((job) => (
+          <Card sx={{ mb: 3 }} key={job.sessionId || `job-${Math.random()}`}>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
+                <Box>
+                  <Typography variant="h6">
+                    {job.vendorId ? `Vendor ID: ${job.vendorId}` : 'Onbekende vendor'}
+                  </Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    Sessie ID: {job.sessionId}
+                  </Typography>
+                </Box>
+                <Box>
+                  {getStatusChip(job.status)}
+                </Box>
+              </Box>
+              
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2">Crawl parameters:</Typography>
+                  <Box sx={{ ml: 2, mt: 1 }}>
+                    <Typography variant="body2" color="textSecondary">
+                      Start URL(s): {job.startUrls ? job.startUrls.join(', ') : 'Onbekend'}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      Max diepte: {job.maxDepth || 'Onbekend'}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      Max pagina's: {job.maxPages || 'Onbekend'}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      Stealth modus: {job.stealthMode ? 'Ja' : 'Nee'}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      Gestart: {formatRelativeDate(job.startTime)}
+                    </Typography>
+                    <Typography variant="body2" color="textSecondary">
+                      Looptijd: {job.duration ? `${job.duration} seconden` : 'Bezig...'}
+                    </Typography>
                   </Box>
+                </Grid>
+                
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2">Voortgang:</Typography>
+                  <Box sx={{ mt: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Typography variant="body2" color="textSecondary">
+                        {job.progress ? `${Math.round(job.progress)}%` : 'Bezig...'}
+                      </Typography>
+                      <Typography variant="body2" color="textSecondary">
+                        Pagina's: {job.pagesCrawled || 0} / {job.maxPages || 'onbeperkt'}
+                      </Typography>
+                    </Box>
+                    <LinearProgress 
+                      variant={job.progress ? "determinate" : "indeterminate"} 
+                      value={job.progress ? job.progress : 0} 
+                      sx={{ mt: 1, mb: 2, height: 10, borderRadius: 1 }}
+                    />
+                    
+                    <Typography variant="body2" color="textSecondary">
+                      Huidige diepte: {job.currentDepth !== undefined ? job.currentDepth : 0} / {job.maxDepth || 'onbeperkt'}
+                    </Typography>
+                    
+                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+                      <strong>Huidige URL:</strong> {job.currentUrl || 'Wachten...'}
+                    </Typography>
+                  </Box>
+                  
+                  {job.statistics && (
+                    <Box sx={{ mt: 2 }}>
+                      <Typography variant="subtitle2">Statistieken:</Typography>
+                      <Grid container spacing={1} sx={{ mt: 0.5 }}>
+                        <Grid item xs={6}>
+                          <Typography variant="body2" color="textSecondary">
+                            Unieke links: {job.statistics.uniqueLinks || 0}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="body2" color="textSecondary">
+                            Interne links: {job.statistics.internalLinks || 0}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="body2" color="textSecondary">
+                            Externe links: {job.statistics.externalLinks || 0}
+                          </Typography>
+                        </Grid>
+                        <Grid item xs={6}>
+                          <Typography variant="body2" color="textSecondary">
+                            Gem. verwerking: {job.avgProcessingTime ? `${job.avgProcessingTime} sec` : 'N/A'}
+                          </Typography>
+                        </Grid>
+                      </Grid>
+                    </Box>
+                  )}
+                </Grid>
+                
+                {job.recentUrls && job.recentUrls.length > 0 && (
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2">Recent bezochte URLs:</Typography>
+                    <Box sx={{ mt: 1, bgcolor: '#f5f5f5', p: 1.5, borderRadius: 1, maxHeight: 100, overflowY: 'auto' }}>
+                      {job.recentUrls.map((url, index) => (
+                        <Typography key={index} variant="body2" sx={{ wordBreak: 'break-all', fontSize: '0.8rem', mb: 0.5 }}>
+                          • {url}
+                        </Typography>
+                      ))}
+                    </Box>
+                  </Grid>
+                )}
+                
+                {job.errors > 0 && (
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" color="error">
+                      Fouten: {job.errors}
+                    </Typography>
+                  </Grid>
                 )}
               </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        ))
       ) : (
         <Card sx={{ mb: 4 }}>
           <CardContent>
-            <Typography variant="body1">Geen actieve crawl jobs</Typography>
+            <Typography>Geen actieve crawl jobs</Typography>
           </CardContent>
         </Card>
       )}

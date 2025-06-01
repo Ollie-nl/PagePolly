@@ -7,6 +7,19 @@ import supabaseClient from '../lib/supabaseClient';
 class PuppeteerCrawlerAPI {
   
   /**
+   * Initialiseert de API client met de juiste basis URL
+   */
+  constructor() {
+    // Get the API base URL from environment variables or default to current host
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || 
+      (window.location.hostname === 'localhost' ? 'http://localhost:4000' : '');
+    
+    // Specifiek pad voor puppeteer crawler endpoints
+    this.apiBasePath = `${baseUrl}/api/crawls`;
+    console.log('PuppeteerCrawlerAPI geïnitialiseerd met base path:', this.apiBasePath);
+  }
+
+  /**
    * Haal de authenticatieheader op met JWT token
    * @returns {Promise<Object>} - Headers object met autorisatie
    */
@@ -210,6 +223,97 @@ class PuppeteerCrawlerAPI {
     // Deze functie gebruikt dezelfde endpoint als getCrawlStatus
     // want de status response bevat ook de resultaten
     return this.getCrawlStatus(sessionId);
+  }
+
+  /**
+   * Haal crawl geschiedenis op voor een bepaalde vendor
+   * @param {string} vendorId - ID van de vendor
+   * @returns {Promise<Array>} - Lijst met crawl jobs voor de vendor
+   */
+  async getCrawlHistoryForVendor(vendorId) {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${this.apiBasePath}/crawl-history/${vendorId}`, {
+        method: 'GET',
+        headers
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Fout bij ophalen crawl geschiedenis:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Haal alle actieve crawl jobs op met gedetailleerde informatie
+   * @returns {Promise<Array>} - Lijst met actieve crawl jobs
+   */
+  async getActiveCrawls() {
+    try {
+      const headers = await this.getAuthHeaders();
+      const url = `${this.apiBasePath}/active`;
+      
+      console.log('Ophalen actieve crawls van URL:', url);
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers
+      });
+      
+      console.log('Response status:', response.status, response.statusText);
+      
+      if (!response.ok) {
+        console.warn(`HTTP error ${response.status} bij ophalen actieve crawls`);
+        return []; // Retourneer een lege array bij HTTP errors
+      }
+      
+      // Lees de response text en controleer of het geldige JSON is
+      const text = await response.text();
+      
+      // Log de eerste 100 karakters van de response om te zien wat er terugkomt
+      console.debug('Response eerste 100 karakters:', text.substring(0, 100));
+      
+      // Als de response begint met '<', dan is het waarschijnlijk HTML in plaats van JSON
+      if (text.trim().startsWith('<')) {
+        console.error('Response bevat HTML in plaats van JSON. Waarschijnlijk een server error.');
+        return [];
+      }
+      
+      let result;
+      try {
+        // Probeer de tekst te parsen als JSON
+        result = text ? JSON.parse(text) : {};
+        console.log('JSON response geparsed:', result);
+        console.log('Response format check:', {
+          isObject: typeof result === 'object',
+          hasData: result && 'data' in result,
+          dataIsArray: result && result.data && Array.isArray(result.data),
+          resultIsArray: Array.isArray(result)
+        });
+      } catch (parseError) {
+        console.error('Ongeldige JSON response van server:', parseError);
+        console.debug('Ontvangen response tekst:', text);
+        return []; // Retourneer een lege array bij JSON parse errors
+      }
+      
+      // Controleer of de response het verwachte formaat heeft
+      if (!result || typeof result !== 'object') {
+        console.error('Ongeldig response formaat van server:', result);
+        return [];
+      }
+      
+      // Controleer of we een data array hebben of een andere structuur
+      return Array.isArray(result.data) ? result.data : 
+             (Array.isArray(result) ? result : []);
+    } catch (error) {
+      console.error('Fout bij ophalen actieve crawl jobs:', error);
+      return []; // Return een lege array in geval van fouten om UI crashes te voorkomen
+    }
   }
 }
 

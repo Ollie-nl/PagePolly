@@ -88,10 +88,11 @@ export const getActiveCrawls = createAsyncThunk(
   'crawl/getActiveCrawls',
   async (_, { rejectWithValue }) => {
     try {
-      console.log('Ophalen actieve crawls');
-      // Hier zou je normaal de API aanroepen
-      // Voor nu retourneren we een leeg array om de import error op te lossen
-      return [];
+      console.log('Ophalen actieve crawls via Redux thunk');
+      // Gebruik de nieuwe API methode om actieve crawls op te halen
+      const activeCrawls = await puppeteerCrawlerApi.getActiveCrawls();
+      console.log('Actieve crawls opgehaald in thunk:', activeCrawls);
+      return activeCrawls;
     } catch (error) {
       console.error('Fout bij ophalen actieve crawls:', error);
       return rejectWithValue(error.message || 'Kon actieve crawls niet ophalen');
@@ -237,7 +238,10 @@ const crawlSlice = createSlice({
       })
       .addCase(getActiveCrawls.fulfilled, (state, action) => {
         state.loading = false;
+        console.log('getActiveCrawls.fulfilled met payload:', action.payload);
         state.activeCrawls = action.payload;
+        // Debug: controleer of de state correct is bijgewerkt
+        console.log('Redux state na update:', state.activeCrawls);
       })
       .addCase(getActiveCrawls.rejected, (state, action) => {
         state.loading = false;
