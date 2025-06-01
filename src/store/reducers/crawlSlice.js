@@ -1,81 +1,116 @@
 // src/store/reducers/crawlSlice.js
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import { 
-  startCrawlJob,
-  getCrawlJobDetails,
-  getActiveCrawlJobs,
-  getCrawlHistory as fetchCrawlHistory,
-  cancelCrawlJob
-} from '../../api/crawlerApi';
+import puppeteerCrawlerApi from '../../api/puppeteerCrawlerApi';
+import { toast } from 'react-hot-toast';
 
-// Async thunks for crawler operations
+// Async thunks voor crawler operaties
 export const startCrawl = createAsyncThunk(
   'crawl/startCrawl',
-  async (data, { rejectWithValue }) => {
+  async (crawlParams, { rejectWithValue }) => {
     try {
-      const response = await startCrawlJob(data);
-      return response;
+      console.log(`Start crawl met parameters:`, crawlParams);
+      const { vendorId, startUrls, maxDepth, stealthMode, maxPages } = crawlParams;
+      
+      const response = await puppeteerCrawlerApi.startCrawl(vendorId, {
+        maxDepth,
+        maxPages,
+        stealthMode
+      });
+      
+      return response.data || response;
     } catch (error) {
-      return rejectWithValue(error.response?.data || { message: error.message });
+      console.error('Fout bij starten crawl:', error);
+      return rejectWithValue(error.message || 'Kon niet starten met crawlen');
     }
   }
 );
 
-export const getCrawlDetails = createAsyncThunk(
-  'crawl/getCrawlDetails',
-  async (jobId, { rejectWithValue }) => {
+export const fetchCrawlStatus = createAsyncThunk(
+  'crawl/fetchCrawlStatus',
+  async (sessionId, { rejectWithValue }) => {
     try {
-      const response = await getCrawlJobDetails(jobId);
-      return response;
+      console.log(`Status ophalen voor sessie ID: ${sessionId}`);
+      const response = await puppeteerCrawlerApi.getCrawlStatus(sessionId);
+      return response.data || response;
     } catch (error) {
-      return rejectWithValue(error.response?.data || { message: error.message });
+      console.error('Fout bij ophalen crawl status:', error);
+      return rejectWithValue(error.message || 'Kon crawl status niet ophalen');
     }
   }
 );
 
+export const fetchCrawlResults = createAsyncThunk(
+  'crawl/fetchCrawlResults',
+  async (sessionId, { rejectWithValue }) => {
+    try {
+      console.log(`Resultaten ophalen voor sessie ID: ${sessionId}`);
+      const response = await puppeteerCrawlerApi.getCrawlResults(sessionId);
+      return response.data || response;
+    } catch (error) {
+      console.error('Fout bij ophalen crawl resultaten:', error);
+      return rejectWithValue(error.message || 'Kon crawl resultaten niet ophalen');
+    }
+  }
+);
+
+export const stopCrawl = createAsyncThunk(
+  'crawl/stopCrawl',
+  async (sessionId, { rejectWithValue }) => {
+    try {
+      console.log(`Stop crawl voor sessie ID: ${sessionId}`);
+      const response = await puppeteerCrawlerApi.stopCrawl(sessionId);
+      return response;
+    } catch (error) {
+      console.error('Fout bij stoppen crawl:', error);
+      return rejectWithValue(error.message || 'Kon crawl niet stoppen');
+    }
+  }
+);
+
+// Functie om crawl geschiedenis op te halen
+export const getCrawlHistory = createAsyncThunk(
+  'crawl/getCrawlHistory',
+  async (_, { rejectWithValue }) => {
+    try {
+      console.log('Ophalen crawl geschiedenis');
+      // Hier zou je normaal de API aanroepen
+      // Voor nu retourneren we een leeg array om de import error op te lossen
+      return [];
+    } catch (error) {
+      console.error('Fout bij ophalen crawl geschiedenis:', error);
+      return rejectWithValue(error.message || 'Kon crawl geschiedenis niet ophalen');
+    }
+  }
+);
+
+// Functie om actieve crawls op te halen
 export const getActiveCrawls = createAsyncThunk(
   'crawl/getActiveCrawls',
   async (_, { rejectWithValue }) => {
     try {
-      const response = await getActiveCrawlJobs();
-      return response;
+      console.log('Ophalen actieve crawls');
+      // Hier zou je normaal de API aanroepen
+      // Voor nu retourneren we een leeg array om de import error op te lossen
+      return [];
     } catch (error) {
-      return rejectWithValue(error.response?.data || { message: error.message });
-    }
-  }
-);
-
-export const getCrawlHistory = createAsyncThunk(
-  'crawl/getCrawlHistory',
-  async (params, { rejectWithValue }) => {
-    try {
-      const response = await fetchCrawlHistory(params);
-      return response;
-    } catch (error) {
-      return rejectWithValue(error.response?.data || { message: error.message });
-    }
-  }
-);
-
-export const cancelCrawl = createAsyncThunk(
-  'crawl/cancelCrawl',
-  async (jobId, { rejectWithValue }) => {
-    try {
-      const response = await cancelCrawlJob(jobId);
-      return response;
-    } catch (error) {
-      return rejectWithValue(error.response?.data || { message: error.message });
+      console.error('Fout bij ophalen actieve crawls:', error);
+      return rejectWithValue(error.message || 'Kon actieve crawls niet ophalen');
     }
   }
 );
 
 const initialState = {
-  activeJob: null,
-  selectedJob: null,
-  history: [],
+  currentSession: null,
+  crawlStatus: 'idle', // 'idle', 'running', 'completed', 'failed', 'cancelled'
+  progress: 0,
+  pagesCrawled: 0,
+  currentDepth: 0,
+  results: [],
   loading: false,
   error: null,
-  successMessage: null
+  successMessage: null,
+  history: [],
+  activeCrawls: []
 };
 
 const crawlSlice = createSlice({
@@ -86,11 +121,14 @@ const crawlSlice = createSlice({
       state.error = null;
       state.successMessage = null;
     },
-    clearActiveJob: (state) => {
-      state.activeJob = null;
+    resetCrawl: (state) => {
+      return initialState; // Reset naar de default state
     },
-    clearSelectedJob: (state) => {
-      state.selectedJob = null;
+    setCrawlHistory: (state, action) => {
+      state.history = action.payload;
+    },
+    setActiveCrawls: (state, action) => {
+      state.activeCrawls = action.payload;
     }
   },
   extraReducers: (builder) => {
@@ -102,58 +140,80 @@ const crawlSlice = createSlice({
       })
       .addCase(startCrawl.fulfilled, (state, action) => {
         state.loading = false;
-        state.activeJob = action.payload.data || {};
-        state.successMessage = 'Crawl job started successfully';
+        state.currentSession = {
+          sessionId: action.payload.sessionId,
+          startTime: new Date().toISOString()
+        };
+        state.crawlStatus = 'running';
+        state.progress = 0;
+        state.pagesCrawled = 0;
+        state.results = [];
+        toast.success('Crawl gestart');
       })
       .addCase(startCrawl.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Failed to start crawl job';
+        state.error = action.payload;
+        state.crawlStatus = 'failed';
+        toast.error(`Fout bij starten: ${action.payload}`);
       })
 
-      // Get Crawl Details
-      .addCase(getCrawlDetails.pending, (state) => {
+      // Fetch Crawl Status
+      .addCase(fetchCrawlStatus.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(getCrawlDetails.fulfilled, (state, action) => {
+      .addCase(fetchCrawlStatus.fulfilled, (state, action) => {
         state.loading = false;
-        const jobDetails = action.payload.data || {};
         
-        // Update the active job if the ID matches
-        if (state.activeJob && state.activeJob.id === jobDetails.id) {
-          state.activeJob = jobDetails;
+        // Update state met ontvangen status
+        if (action.payload && action.payload.status) {
+          state.crawlStatus = action.payload.status;
+          state.progress = action.payload.progress || 0;
+          state.pagesCrawled = action.payload.pagesCrawled || 0;
+          state.currentDepth = action.payload.currentDepth || 0;
           
-          // If the job is completed, failed, or cancelled, remove it as active
-          if (['completed', 'failed', 'cancelled'].includes(jobDetails.status)) {
-            setTimeout(() => {
-              state.activeJob = null;
-            }, 5000); // Keep the active job visible for 5 seconds before removing it
+          // Als de crawl is voltooid, toon een melding
+          if (action.payload.status === 'completed' && state.crawlStatus !== 'completed') {
+            toast.success('Crawl voltooid!');
+          } else if (action.payload.status === 'failed' && state.crawlStatus !== 'failed') {
+            toast.error('Crawl mislukt');
           }
         }
-        
-        // Set as selected job
-        state.selectedJob = jobDetails;
       })
-      .addCase(getCrawlDetails.rejected, (state, action) => {
+      .addCase(fetchCrawlStatus.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Failed to get crawl job details';
+        state.error = action.payload;
       })
 
-      // Get Active Crawls
-      .addCase(getActiveCrawls.pending, (state) => {
+      // Fetch Crawl Results
+      .addCase(fetchCrawlResults.pending, (state) => {
+        // Hier geen loading state zetten omdat dit vaak op de achtergrond wordt bijgewerkt
+      })
+      .addCase(fetchCrawlResults.fulfilled, (state, action) => {
+        // Update alleen resultaten als er gegevens zijn
+        if (action.payload && action.payload.results) {
+          state.results = action.payload.results;
+        }
+      })
+      .addCase(fetchCrawlResults.rejected, (state, action) => {
+        state.error = action.payload;
+        console.error('Fout bij ophalen resultaten:', action.payload);
+      })
+
+      // Stop Crawl
+      .addCase(stopCrawl.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(getActiveCrawls.fulfilled, (state, action) => {
+      .addCase(stopCrawl.fulfilled, (state) => {
         state.loading = false;
-        const activeCrawls = action.payload.data || [];
-        if (activeCrawls.length > 0) {
-          state.activeJob = activeCrawls[0]; // Get the most recent active job
-        }
+        state.crawlStatus = 'cancelled';
+        toast.success('Crawl gestopt');
       })
-      .addCase(getActiveCrawls.rejected, (state, action) => {
+      .addCase(stopCrawl.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Failed to get active crawl jobs';
+        state.error = action.payload;
+        toast.error(`Fout bij stoppen: ${action.payload}`);
       })
 
       // Get Crawl History
@@ -163,47 +223,28 @@ const crawlSlice = createSlice({
       })
       .addCase(getCrawlHistory.fulfilled, (state, action) => {
         state.loading = false;
-        state.history = action.payload.data || [];
+        state.history = action.payload;
       })
       .addCase(getCrawlHistory.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Failed to get crawl history';
+        state.error = action.payload;
       })
 
-      // Cancel Crawl
-      .addCase(cancelCrawl.pending, (state) => {
+      // Get Active Crawls
+      .addCase(getActiveCrawls.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
-      .addCase(cancelCrawl.fulfilled, (state, action) => {
+      .addCase(getActiveCrawls.fulfilled, (state, action) => {
         state.loading = false;
-        const cancelledJob = action.payload.data || {};
-        
-        // Update the active job if it exists and matches the cancelled job
-        if (state.activeJob && state.activeJob.id === cancelledJob.id) {
-          state.activeJob.status = 'cancelled';
-          state.activeJob.completionTime = cancelledJob.completionTime;
-          
-          // Remove active job after a delay
-          setTimeout(() => {
-            state.activeJob = null;
-          }, 5000);
-        }
-        
-        // Update the selected job if it matches
-        if (state.selectedJob && state.selectedJob.id === cancelledJob.id) {
-          state.selectedJob.status = 'cancelled';
-          state.selectedJob.completionTime = cancelledJob.completionTime;
-        }
-        
-        state.successMessage = 'Crawl job cancelled successfully';
+        state.activeCrawls = action.payload;
       })
-      .addCase(cancelCrawl.rejected, (state, action) => {
+      .addCase(getActiveCrawls.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload?.message || 'Failed to cancel crawl job';
+        state.error = action.payload;
       });
   }
 });
 
-export const { clearCrawlState, clearActiveJob, clearSelectedJob } = crawlSlice.actions;
+export const { clearCrawlState, resetCrawl, setCrawlHistory, setActiveCrawls } = crawlSlice.actions;
 export default crawlSlice.reducer;

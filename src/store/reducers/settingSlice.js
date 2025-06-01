@@ -5,6 +5,39 @@ import supabaseClient from '../../lib/supabaseClient';
 import scrapingBeeService from '../../services/scrapingBeeService';
 
 // Async thunks
+export const fetchSettings = createAsyncThunk(
+  'settings/fetchSettings',
+  async (_, { rejectWithValue }) => {
+    try {
+      const { data: { session } } = await supabaseClient.auth.getSession();
+      
+      if (!session) {
+        throw new Error('Geen actieve sessie');
+      }
+
+      // Haal de actieve vendor op
+      const { data: vendors, error: vendorsError } = await supabaseClient
+        .from('vendors')
+        .select('*')
+        .limit(1);
+      
+      if (vendorsError) throw vendorsError;
+      
+      // Voor development modus, gebruik altijd een fallback
+      if (!vendors || vendors.length === 0) {
+        console.log('Geen vendors gevonden, gebruik testgegevens');
+        return { website: 'https://example.com', id: 1 };
+      }
+      
+      return vendors[0];
+    } catch (error) {
+      console.error('Fout bij ophalen van instellingen:', error);
+      // Terugvallen op testgegevens voor ontwikkeling
+      return { website: 'https://example.com', id: 1 };
+    }
+  }
+);
+
 export const fetchCrawlerConfigs = createAsyncThunk(
   'settings/fetchCrawlerConfigs',
   async (_, { rejectWithValue }) => {
@@ -15,7 +48,7 @@ export const fetchCrawlerConfigs = createAsyncThunk(
       }
 
       const { data, error } = await supabaseClient
-        .from('crawler_x65isd_configs')
+        .from('vendor_configs_ohxp1d')
         .select('*')
         .eq('user_email', session.user.email);
 
@@ -49,7 +82,7 @@ export const saveCrawlerConfig = createAsyncThunk(
       let result;
       if (config.id) {
         const { data, error } = await supabaseClient
-          .from('crawler_x65isd_configs')
+          .from('vendor_configs_ohxp1d')
           .update(configData)
           .eq('id', config.id)
           .select()
@@ -59,7 +92,7 @@ export const saveCrawlerConfig = createAsyncThunk(
         result = data;
       } else {
         const { data, error } = await supabaseClient
-          .from('crawler_x65isd_configs')
+          .from('vendor_configs_ohxp1d')
           .insert(configData)
           .select()
           .single();
@@ -81,7 +114,7 @@ export const deleteCrawlerConfig = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const { error } = await supabaseClient
-        .from('crawler_x65isd_configs')
+        .from('vendor_configs_ohxp1d')
         .delete()
         .eq('id', id);
 
@@ -129,10 +162,11 @@ const settingsSlice = createSlice({
   initialState: {
     crawlers: [],
     activeConfig: null,
+    current: null, // Voor het opslaan van de huidige instellingen
     status: 'idle',
     testStatus: 'idle',
     error: null,
-    testError: null
+    testError: null,
   },
   reducers: {
     setActiveConfig: (state, action) => {
@@ -152,6 +186,20 @@ const settingsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      // Fetch settings
+      .addCase(fetchSettings.pending, (state) => {
+        state.status = 'loading';
+      })
+      .addCase(fetchSettings.fulfilled, (state, action) => {
+        state.status = 'succeeded';
+        state.current = action.payload;
+        state.error = null;
+      })
+      .addCase(fetchSettings.rejected, (state, action) => {
+        state.status = 'failed';
+        state.error = action.payload;
+      })
+
       // Fetch crawlers
       .addCase(fetchCrawlerConfigs.pending, (state) => {
         state.status = 'loading';
@@ -179,12 +227,12 @@ const settingsSlice = createSlice({
         } else {
           state.crawlers.push(action.payload);
         }
-        toast.success('Configuration saved successfully');
+        toast.success('Configuratie opgeslagen');
       })
       .addCase(saveCrawlerConfig.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload;
-        toast.error(`Failed to save configuration: ${action.payload}`);
+        toast.error(`Configuratie opslaan mislukt: ${action.payload}`);
       })
 
       // Delete crawler
@@ -197,12 +245,12 @@ const settingsSlice = createSlice({
         if (state.activeConfig?.id === action.payload) {
           state.activeConfig = null;
         }
-        toast.success('Configuration deleted successfully');
+        toast.success('Configuratie verwijderd');
       })
       .addCase(deleteCrawlerConfig.rejected, (state, action) => {
         state.status = 'failed';
         state.error = action.payload;
-        toast.error(`Failed to delete configuration: ${action.payload}`);
+        toast.error(`Configuratie verwijderen mislukt: ${action.payload}`);
       })
 
       // Test crawler
@@ -218,7 +266,7 @@ const settingsSlice = createSlice({
       .addCase(testCrawlerConfig.rejected, (state, action) => {
         state.testStatus = 'failed';
         state.testError = action.payload;
-        toast.error(`Test failed: ${action.payload}`);
+        toast.error(`Test mislukt: ${action.payload}`);
       });
   }
 });

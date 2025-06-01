@@ -256,6 +256,7 @@ const VendorManagement = () => {
                 <div className="flex items-center gap-2">
                   <CrawlButton 
                     vendorId={vendor.id}
+                    vendorUrl={vendor.url}
                     settings={settings}
                     onCrawlComplete={(job) => {
                       if (job.status === 'completed') {

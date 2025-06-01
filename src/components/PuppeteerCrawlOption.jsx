@@ -27,7 +27,8 @@ const PuppeteerCrawlOption = ({ settings, onSettingsChange, disabled }) => {
     simulateHumanBehavior: 'Simulates human-like behavior by adding random delays and mouse movements',
     useProxy: 'Routes requests through a proxy server to avoid IP blocks',
     maxRetries: 'Number of retry attempts for failed requests',
-    waitTime: 'Time to wait for dynamic content to load (in milliseconds)'
+    waitTime: 'Time to wait for dynamic content to load (in milliseconds)',
+    maxDepth: 'Hoe diep de crawler door de website structuur moet navigeren. Hogere waarden betekenen meer pagina\'s maar langere crawl tijd.'
   };
 
   return (
@@ -87,6 +88,28 @@ const PuppeteerCrawlOption = ({ settings, onSettingsChange, disabled }) => {
             value={settings.maxRetries}
             onChange={(_, value) => handleChange('maxRetries', value)}
             min={0}
+            max={5}
+            marks
+            step={1}
+            valueLabelDisplay="auto"
+            disabled={disabled}
+            sx={{ width: '200px' }}
+          />
+        </Box>
+
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="body2" gutterBottom>
+            Crawl Diepte
+            <Tooltip title={tooltips.maxDepth}>
+              <IconButton size="small">
+                <InfoOutlined fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Typography>
+          <Slider
+            value={settings.maxDepth || 2}
+            onChange={(_, value) => handleChange('maxDepth', value)}
+            min={1}
             max={5}
             marks
             step={1}

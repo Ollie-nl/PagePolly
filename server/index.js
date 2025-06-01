@@ -3,10 +3,11 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import dotenv from 'dotenv';
+import puppeteer from 'puppeteer';
 import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
 import process from 'process';
-import puppeteerCrawlRoutes from './routes/puppeteerCrawlRoutes.js';
+import crawlerRoutes from './routes/crawlerRoutes.js';
 import authMiddleware from './middleware/auth.js';
 // import createScrapingBeeProxy from './middleware/scrapingBeeProxy.js';
 
@@ -55,6 +56,8 @@ app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
+
+app.use('/api/crawler', crawlerRoutes);
 
 // Configureer Content Security Policy headers
 app.use((req, res, next) => {
@@ -175,11 +178,6 @@ app.post('/api/crawls/test', async (req, res) => {
   try {
     // Start tijd voor duur berekening
     const startTime = Date.now();
-    
-    // Importeer puppeteer en gebruik StealthPlugin om detectie te voorkomen
-    const puppeteer = (await import('puppeteer-extra')).default;
-    const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
-    puppeteer.use(StealthPlugin());
     
     // Launch browser met minimale instellingen
     const browser = await puppeteer.launch({
@@ -354,9 +352,12 @@ app.post('/api/crawls', async (req, res) => {
     
     let crawlJob = null;
     
-    // In ontwikkelingsmodus, sla database-operaties over
+    // Maak altijd een crawl job aan, ongeacht development mode
+    // Dit zorgt voor consistente verwerking van crawls
+    console.log(`Crawl job aanmaken voor ${urls[0]}`);
+    
+    // In ontwikkelingsmodus, simuleer alleen de database operatie
     if (process.env.NODE_ENV === 'development') {
-      console.log(`Development mode: Simuleer crawl job aanmaken voor ${urls[0]}`);
       // Simuleer een database response
       crawlJob = {
         id: crawlId,
@@ -372,7 +373,7 @@ app.post('/api/crawls', async (req, res) => {
       // Maak een nieuwe crawl job entry in de database
       try {
         const { data, error } = await supabase
-          .from('crawl_jobs_ohxp1d')
+          .from('crawl_jobs')
           .insert({
             id: crawlId,
             user_email: userId,
@@ -445,7 +446,7 @@ async function updateCrawlJobStatus(crawlId, status, progress) {
     }
     
     const { error } = await supabase
-      .from('crawl_jobs_ohxp1d')
+      .from('crawl_jobs')
       .update({
         status: status,
         progress: progress,
@@ -463,36 +464,56 @@ async function updateCrawlJobStatus(crawlId, status, progress) {
 
 // Functie om crawl resultaat op te slaan
 async function saveCrawlResult(crawlId, pageData) {
+  console.log(`Opslaan crawl resultaat voor job ${crawlId}, URL: ${pageData.url}`);
+  
   try {
-    // In ontwikkelingsmodus, sla database-operaties over
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`Development mode: Simuleer opslaan resultaat voor crawl ${crawlId}, URL: ${pageData.url}`);
-      return;
-    }
-    
-    const { error } = await supabase
+    // Controleer of het resultaat al bestaat
+    const { data: existing, error: checkError } = await supabase
       .from('crawl_results_ohxp1d')
-      .insert({
-        job_id: crawlId,
-        url: pageData.url,
-        status: pageData.statusCode ? pageData.statusCode.toString() : '200',
-        data: {
-          title: pageData.title,
-          contentType: pageData.contentType,
-          metaTags: pageData.metaTags,
-          links: pageData.links,
-          headers: pageData.headers,
-          html: pageData.html
-        },
-        crawl_duration: pageData.duration || 0,
-        timestamp: new Date().toISOString()
-      });
+      .select('id')
+      .eq('job_id', crawlId)
+      .eq('url', pageData.url)
+      .single();
     
-    if (error) {
-      console.error(`Fout bij opslaan resultaat voor crawl ${crawlId}:`, error);
+    if (checkError && checkError.code !== 'PGRST116') {
+      throw checkError;
     }
-  } catch (err) {
-    console.error(`Fout bij opslaan resultaat voor crawl ${crawlId}:`, err);
+    
+    if (existing) {
+      // Update bestaand resultaat
+      const { error } = await supabase
+        .from('crawl_results_ohxp1d')
+        .update({
+          status: pageData.status || 'completed',
+          data: pageData.data || {},
+          screenshot: pageData.screenshot,
+          crawl_duration: pageData.duration,
+          retry_count: (existing.retry_count || 0) + 1,
+          timestamp: new Date().toISOString()
+        })
+        .eq('id', existing.id);
+      
+      if (error) throw error;
+    } else {
+      // Voeg nieuw resultaat toe
+      const { error } = await supabase
+        .from('crawl_results_ohxp1d')
+        .insert({
+          job_id: crawlId,
+          url: pageData.url,
+          status: pageData.status || 'completed',
+          data: pageData.data || {},
+          screenshot: pageData.screenshot,
+          crawl_duration: pageData.duration,
+          retry_count: 0,
+          timestamp: new Date().toISOString()
+        });
+      
+      if (error) throw error;
+    }
+  } catch (error) {
+    console.error(`Fout bij opslaan crawl resultaat voor ${pageData.url}:`, error);
+    throw error;
   }
 }
 
@@ -500,74 +521,27 @@ async function saveCrawlResult(crawlId, pageData) {
 async function processCrawl(crawlId, urls, settings, crawlerType) {
   console.log(`Start crawl proces voor job ${crawlId} met ${urls.length} start-URLs`);
   
-  // Importeer puppeteer en gebruik StealthPlugin om detectie te voorkomen
-  const puppeteer = (await import('puppeteer-extra')).default;
-  const StealthPlugin = (await import('puppeteer-extra-plugin-stealth')).default;
-  puppeteer.use(StealthPlugin());
-  
-  // Launch browser met minimale instellingen
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
-  });
-  
   try {
-    const startUrl = urls[0]; // Begin met de eerste URL
-    const crawledUrls = new Set(); // Houdt bij welke URLs al zijn gecrawld
-    const urlsToCrawl = [startUrl]; // Queue van URLs om te crawlen
-    let totalPagesCrawled = 0;
-    const MAX_PAGES = 3; // Maximaal 3 pagina's crawlen
+    // Gebruik de crawler service in plaats van een eigen browser instantie
+    // Dit voorkomt dubbele browser instantiatie en socket hang-up problemen
+    const puppeteerCrawlerService = (await import('./services/puppeteer/puppeteerCrawlerService.js')).default;
     
-    // Zolang er URLs zijn om te crawlen en we het maximum niet hebben bereikt
-    while (urlsToCrawl.length > 0 && totalPagesCrawled < MAX_PAGES) {
-      const url = urlsToCrawl.shift();
-      
-      // Als deze URL al is gecrawld, sla over
-      if (crawledUrls.has(url)) {
-        continue;
-      }
-      
-      crawledUrls.add(url);
-      totalPagesCrawled++;
-      
-      console.log(`Crawlen van pagina ${totalPagesCrawled}/${MAX_PAGES}: ${url}`);
-      
-      // Update voortgang
-      const progress = Math.floor((totalPagesCrawled / MAX_PAGES) * 100);
-      await updateCrawlJobStatus(crawlId, 'running', progress);
-      
-      // Crawl de pagina
-      const pageData = await crawlPage(browser, url);
-      
-      // Sla het resultaat op
-      await saveCrawlResult(crawlId, pageData);
-      
-      // Voeg gelinkte URLs toe aan de queue
-      if (pageData.links && totalPagesCrawled < MAX_PAGES) {
-        for (const link of pageData.links) {
-          // Voeg alleen URLs toe van hetzelfde domein
-          try {
-            const linkUrl = new URL(link.url);
-            const startUrlObj = new URL(startUrl);
-            
-            if (linkUrl.hostname === startUrlObj.hostname && !crawledUrls.has(link.url)) {
-              urlsToCrawl.push(link.url);
-            }
-          } catch (err) {
-            // Ongeldige URL, negeren
-            console.warn(`Ongeldige URL gevonden: ${link.url}`);
-          }
-        }
-      }
-    }
+    // Start de crawler met de juiste parameters
+    const result = await puppeteerCrawlerService.startCrawl({
+      sessionId: crawlId,
+      startUrls: urls,
+      maxDepth: settings?.maxDepth || 2,
+      maxPages: settings?.maxPages || 3,
+      vendorId: settings?.vendorId,
+      userId: 'test-user',
+      options: settings
+    });
     
-    // Update status naar voltooid
-    await updateCrawlJobStatus(crawlId, 'completed', 100);
-    console.log(`Crawl ${crawlId} voltooid. ${totalPagesCrawled} pagina's verwerkt.`);
-    
-  } finally {
-    // Sluit browser altijd, zelfs bij fouten
-    await browser.close();
+    console.log(`Crawl gestart via service: ${result.sessionId}`);
+    return result;
+  } catch (error) {
+    console.error(`Fout bij starten crawl via service: ${error.message}`);
+    throw error;
   }
 }
 
