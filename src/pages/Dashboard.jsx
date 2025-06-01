@@ -16,7 +16,9 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Paper
+  Paper,
+  Tooltip,
+  Button
 } from '@mui/material';
 import { formatDistance } from 'date-fns';
 import { nl } from 'date-fns/locale';
@@ -116,6 +118,25 @@ function Dashboard() {
     );
   };
 
+  // Helper function voor het formatteren van tijd in seconden naar leesbare notatie
+  const formatDuration = (seconds) => {
+    if (!seconds && seconds !== 0) return 'N/A';
+    
+    if (seconds < 60) return `${seconds} sec`;
+    
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    
+    if (minutes < 60) {
+      return `${minutes}m ${remainingSeconds}s`;
+    }
+    
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    
+    return `${hours}u ${remainingMinutes}m ${remainingSeconds}s`;
+  };
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>Dashboard</Typography>
@@ -177,133 +198,129 @@ function Dashboard() {
       {/* Actieve Crawl Jobs */}
       <Typography variant="h5" gutterBottom sx={{ mt: 4 }}>Actieve Crawl Jobs</Typography>
       {Array.isArray(activeCrawls) && activeCrawls.length > 0 ? (
-        activeCrawls.map((job) => (
-          <Card sx={{ mb: 3 }} key={job.sessionId || `job-${Math.random()}`}>
+        activeCrawls.map((crawl) => (
+          <Card sx={{ mb: 3 }} key={crawl.sessionId || `job-${Math.random()}`}>
             <CardContent>
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                <Box>
-                  <Typography variant="h6">
-                    {job.vendorId ? `Vendor ID: ${job.vendorId}` : 'Onbekende vendor'}
-                  </Typography>
-                  <Typography variant="body2" color="textSecondary">
-                    Sessie ID: {job.sessionId}
-                  </Typography>
-                </Box>
-                <Box>
-                  {getStatusChip(job.status)}
-                </Box>
+              {/* Crawl info header */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="h6">
+                  Vendor ID: {crawl.vendorId}
+                </Typography>
+                <Chip 
+                  label={crawl.activityStatus || crawl.status} 
+                  color={
+                    crawl.activityStatus === 'Actief bezig' ? 'success' : 
+                    crawl.activityStatus === 'Recent actief' ? 'info' :
+                    crawl.activityStatus === 'Mogelijk vastgelopen' ? 'warning' :
+                    crawl.activityStatus === 'Voltooid' ? 'secondary' : 
+                    crawl.activityStatus === 'Mislukt' ? 'error' : 'default'
+                  } 
+                  size="medium"
+                  sx={{ fontWeight: 'bold' }}
+                />
               </Box>
-              
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Sessie ID: {crawl.sessionId}
+              </Typography>
+
+              {/* Crawl parameters section */}
+              <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
+                Crawl parameters
+              </Typography>
               <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
-                  <Typography variant="subtitle2">Crawl parameters:</Typography>
-                  <Box sx={{ ml: 2, mt: 1 }}>
-                    <Typography variant="body2" color="textSecondary">
-                      Start URL(s): {job.startUrls ? job.startUrls.join(', ') : 'Onbekend'}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      Max diepte: {job.maxDepth || 'Onbekend'}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      Max pagina's: {job.maxPages || 'Onbekend'}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      Stealth modus: {job.stealthMode ? 'Ja' : 'Nee'}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      Gestart: {formatRelativeDate(job.startTime)}
-                    </Typography>
-                    <Typography variant="body2" color="textSecondary">
-                      Looptijd: {job.duration ? `${job.duration} seconden` : 'Bezig...'}
-                    </Typography>
-                  </Box>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Typography variant="body2">
+                    <span style={{ fontWeight: 'bold' }}>Start URLs:</span> {crawl.startUrls ? crawl.startUrls.join(', ') : 'Onbekend'}
+                  </Typography>
                 </Grid>
-                
-                <Grid item xs={12} md={6}>
-                  <Typography variant="subtitle2">Voortgang:</Typography>
-                  <Box sx={{ mt: 1 }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Typography variant="body2" color="textSecondary">
-                        {job.progress ? `${Math.round(job.progress)}%` : 'Bezig...'}
-                      </Typography>
-                      <Typography variant="body2" color="textSecondary">
-                        Pagina's: {job.pagesCrawled || 0} / {job.maxPages || 'onbeperkt'}
-                      </Typography>
-                    </Box>
-                    <LinearProgress 
-                      variant={job.progress ? "determinate" : "indeterminate"} 
-                      value={job.progress ? job.progress : 0} 
-                      sx={{ mt: 1, mb: 2, height: 10, borderRadius: 1 }}
-                    />
-                    
-                    <Typography variant="body2" color="textSecondary">
-                      Huidige diepte: {job.currentDepth !== undefined ? job.currentDepth : 0} / {job.maxDepth || 'onbeperkt'}
-                    </Typography>
-                    
-                    <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
-                      <strong>Huidige URL:</strong> {job.currentUrl || 'Wachten...'}
-                    </Typography>
-                  </Box>
-                  
-                  {job.statistics && (
-                    <Box sx={{ mt: 2 }}>
-                      <Typography variant="subtitle2">Statistieken:</Typography>
-                      <Grid container spacing={1} sx={{ mt: 0.5 }}>
-                        <Grid item xs={6}>
-                          <Typography variant="body2" color="textSecondary">
-                            Unieke links: {job.statistics.uniqueLinks || 0}
-                          </Typography>
-                        </Grid>
-                        <Grid item xs={6}>
-                          <Typography variant="body2" color="textSecondary">
-                            Interne links: {job.statistics.internalLinks || 0}
-                          </Typography>
-                        </Grid>
-                        <Grid item xs={6}>
-                          <Typography variant="body2" color="textSecondary">
-                            Externe links: {job.statistics.externalLinks || 0}
-                          </Typography>
-                        </Grid>
-                        <Grid item xs={6}>
-                          <Typography variant="body2" color="textSecondary">
-                            Gem. verwerking: {job.avgProcessingTime ? `${job.avgProcessingTime} sec` : 'N/A'}
-                          </Typography>
-                        </Grid>
-                      </Grid>
-                    </Box>
-                  )}
+                <Grid item xs={12} sm={6} md={3}>
+                  <Typography variant="body2">
+                    <span style={{ fontWeight: 'bold' }}>Max diepte:</span> {crawl.maxDepth || 'Onbekend'}
+                  </Typography>
                 </Grid>
-                
-                {job.recentUrls && job.recentUrls.length > 0 && (
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2">Recent bezochte URLs:</Typography>
-                    <Box sx={{ mt: 1, bgcolor: '#f5f5f5', p: 1.5, borderRadius: 1, maxHeight: 100, overflowY: 'auto' }}>
-                      {job.recentUrls.map((url, index) => (
-                        <Typography key={index} variant="body2" sx={{ wordBreak: 'break-all', fontSize: '0.8rem', mb: 0.5 }}>
-                          • {url}
-                        </Typography>
-                      ))}
-                    </Box>
-                  </Grid>
-                )}
-                
-                {job.errors > 0 && (
-                  <Grid item xs={12}>
-                    <Typography variant="subtitle2" color="error">
-                      Fouten: {job.errors}
-                    </Typography>
-                  </Grid>
-                )}
+                <Grid item xs={12} sm={6} md={3}>
+                  <Typography variant="body2">
+                    <span style={{ fontWeight: 'bold' }}>Max pagina's:</span> {crawl.maxPages || 'Onbekend'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={12} sm={6} md={3}>
+                  <Typography variant="body2">
+                    <span style={{ fontWeight: 'bold' }}>Stealth modus:</span> {crawl.stealthMode ? 'Aan' : 'Uit'}
+                  </Typography>
+                </Grid>
               </Grid>
+
+              {/* Voortgang section */}
+              <Typography variant="subtitle2" sx={{ mt: 2, mb: 1, fontWeight: 'bold' }}>
+                Voortgang
+              </Typography>
+              <LinearProgress 
+                variant="determinate" 
+                value={crawl.progress} 
+                sx={{ height: 10, borderRadius: 5, mb: 1, 
+                  '& .MuiLinearProgress-bar': {
+                    animation: crawl.status === 'running' ? 'pulse 1.5s ease-in-out infinite' : 'none',
+                    '@keyframes pulse': {
+                      '0%': { opacity: 1 },
+                      '50%': { opacity: 0.7 },
+                      '100%': { opacity: 1 },
+                    },
+                  }
+                }} 
+              />
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+                <Typography variant="body2">
+                  <b>Voltooid:</b> {crawl.progress}%
+                </Typography>
+                <Typography variant="body2">
+                  <b>Pagina's gecrawld:</b> {crawl.pagesCrawled} / {crawl.maxPages}
+                </Typography>
+                <Typography variant="body2">
+                  <b>Huidige diepte:</b> {crawl.currentDepth} / {crawl.maxDepth}
+                </Typography>
+                <Tooltip title={crawl.currentUrl || 'Geen URL actief'}>
+                  <Typography variant="body2" noWrap sx={{ maxWidth: '100%' }}>
+                    <b>Huidige URL:</b> {crawl.currentUrl ? crawl.currentUrl : 'Geen'}
+                  </Typography>
+                </Tooltip>
+              </Box>
+
+              {/* Voeg activiteitsinformatie toe */}
+              <Box sx={{ mt: 1, mb: 2 }}>
+                <Typography variant="body2">
+                  <b>Actief voor:</b> {formatDuration(crawl.duration)} 
+                  {crawl.timeSinceLastActivity && (
+                    <span> (laatste activiteit: {formatDuration(crawl.timeSinceLastActivity)} geleden)</span>
+                  )}
+                </Typography>
+              </Box>
+
+              {/* Errors */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2">
+                  <span style={{ fontWeight: 'bold' }}>Fouten:</span> {crawl.errors || 0}
+                </Typography>
+                {crawl.status === 'running' && (
+                  <Button 
+                    variant="outlined" 
+                    color="error" 
+                    size="small"
+                    onClick={() => dispatch(stopCrawl(crawl.sessionId))}
+                  >
+                    Stop Crawl
+                  </Button>
+                )}
+              </Box>
             </CardContent>
           </Card>
         ))
       ) : (
-        <Card sx={{ mb: 4 }}>
-          <CardContent>
-            <Typography>Geen actieve crawl jobs</Typography>
-          </CardContent>
-        </Card>
+        <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'grey.100' }}>
+          <Typography variant="body1">Geen actieve crawl jobs</Typography>
+          <Typography variant="body2" color="textSecondary" sx={{ mt: 1 }}>
+            Start een nieuwe crawl om de voortgang hier te zien
+          </Typography>
+        </Paper>
       )}
 
       {/* Recente Crawl Geschiedenis */}

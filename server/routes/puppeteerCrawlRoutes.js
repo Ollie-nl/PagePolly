@@ -8,7 +8,7 @@ const router = express.Router();
 router.post('/start', async (req, res) => {
   try {
     console.log('Crawler start route aangeroepen met:', req.body);
-    const { vendorId, startUrls, maxDepth = 2, maxPages = 50, stealthMode = true } = req.body;
+    const { vendorId, startUrls, maxDepth = 5, maxPages = 100, stealthMode = true } = req.body;
     
     if (!vendorId || !startUrls || startUrls.length === 0) {
       return res.status(400).json({ 
@@ -17,20 +17,20 @@ router.post('/start', async (req, res) => {
       });
     }
     
-    // Voor testen, simuleer een succesvolle start
-    // TODO: Vervang met echte functionaliteit
-    const sessionId = `test-${Date.now()}`;
-    console.log(`Simuleer start crawl met sessie ID: ${sessionId}`);
+    console.log(`Start echte crawl met vendorId: ${vendorId}, startUrls:`, startUrls);
     
-    // Als je de echte service wilt gebruiken, uncomment deze regel:
-    // const result = await puppeteerCrawlerService.startCrawl({
-    //   vendorId,
-    //   userId: req.user?.id || 'anonymous',
-    //   startUrls,
-    //   maxDepth,
-    //   maxPages
-    // });
-    // const sessionId = result.sessionId;
+    // Start de echte crawl via de service
+    const result = await puppeteerCrawlerService.startCrawl({
+      vendorId,
+      userId: req.user?.id || 'anonymous',
+      startUrls,
+      maxDepth,
+      maxPages,
+      stealthMode
+    });
+    
+    const sessionId = result.id;
+    console.log(`Crawl gestart met sessie ID: ${sessionId}`);
     
     res.json({ 
       success: true, 
@@ -92,7 +92,7 @@ router.get('/status/:sessionId', async (req, res) => {
 // Haal alle actieve crawl jobs op
 router.get('/active', async (req, res) => {
   try {
-    console.log('Ophalen van actieve crawl jobs');
+    console.log('Crawls job active route aangeroepen');
     
     // Controleer of de service en de methode bestaan
     if (!puppeteerCrawlerService || typeof puppeteerCrawlerService.getActiveCrawls !== 'function') {
@@ -107,35 +107,43 @@ router.get('/active', async (req, res) => {
     const activeCrawls = await puppeteerCrawlerService.getActiveCrawls();
     console.log(`${activeCrawls.length} actieve crawl jobs gevonden`);
     
+    // Extra debug info over de gevonden crawls
+    if (activeCrawls.length === 0) {
+      console.log('Geen actieve crawls gevonden. Status van crawlerService:',
+        puppeteerCrawlerService.activeCrawls.size, 'crawls in Map');
+    } else {
+      activeCrawls.forEach(crawl => {
+        console.log(`Crawl job info - ID: ${crawl.sessionId}, Status: ${crawl.status}, Pagina's: ${crawl.pagesCrawled}`);
+      });
+    }
+    
     // Zorg ervoor dat we altijd een array hebben, zelfs als de service null of undefined teruggeeft
     const safeActiveCrawls = Array.isArray(activeCrawls) ? activeCrawls : [];
     
-    // Controleer of elke entry in de array een geldig object is
+    // Sanitize the crawl data for JSON response
     const sanitizedCrawls = safeActiveCrawls.map(crawl => {
-      // Als crawl geen object is, return een leeg object
-      if (!crawl || typeof crawl !== 'object') {
-        console.warn('Ongeldige crawl data gevonden:', crawl);
-        return {};
-      }
-      
       try {
-        // Zorg ervoor dat alle date objecten als strings worden weergegeven
-        const sanitized = { ...crawl };
-        if (sanitized.startTime instanceof Date) {
-          sanitized.startTime = sanitized.startTime.toISOString();
-        }
+        // Maak een kopie van het crawl object om te voorkomen dat we het origineel wijzigen
+        const sanitizedCrawl = JSON.parse(JSON.stringify(crawl, (key, value) => {
+          // Converteer Date objecten naar ISO strings
+          if (value instanceof Date) {
+            return value.toISOString();
+          }
+          // Converteer Set objecten naar arrays
+          if (value instanceof Set) {
+            return Array.from(value);
+          }
+          return value;
+        }));
         
-        // Converteer Set objecten naar arrays
-        if (sanitized.recentUrls && sanitized.recentUrls instanceof Set) {
-          sanitized.recentUrls = Array.from(sanitized.recentUrls);
-        }
-        
-        return sanitized;
-      } catch (err) {
-        console.error('Fout bij sanitizen van crawl data:', err);
+        return sanitizedCrawl;
+      } catch (error) {
+        console.error(`Fout bij sanitizen van crawl ${crawl.sessionId}:`, error);
         return {};
       }
     });
+
+    console.log('Verzenden van respons naar client:', JSON.stringify(sanitizedCrawls, null, 2).substring(0, 500) + '...');
     
     // Verstuur het resultaat als JSON
     res.setHeader('Content-Type', 'application/json');
@@ -159,29 +167,59 @@ router.post('/stop/:sessionId', async (req, res) => {
     const { sessionId } = req.params;
     console.log(`Crawler stop route aangeroepen voor sessie: ${sessionId}`);
     
-    // Voor testen, simuleer een succesvolle stop
-    // TODO: Vervang met echte functionaliteit
-    const stopped = true;
-    
-    // Als je de echte service wilt gebruiken, uncomment deze regel:
-    // const stopped = await puppeteerCrawlerService.stopCrawl(sessionId);
-    
-    if (!stopped) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Crawl sessie niet gevonden of reeds gestopt' 
+    // Controleer of de service en de methode bestaan
+    if (!puppeteerCrawlerService || typeof puppeteerCrawlerService.stopCrawl !== 'function') {
+      return res.status(500).json({
+        success: false,
+        message: 'Interne serverfout: Crawler service niet beschikbaar'
       });
     }
     
-    res.json({ 
-      success: true, 
-      message: 'Crawl is gestopt' 
+    // Stop de crawl via de service
+    await puppeteerCrawlerService.stopCrawl(sessionId);
+    
+    res.json({
+      success: true,
+      message: `Crawl ${sessionId} is gestopt`
     });
   } catch (error) {
     console.error('Fout bij stoppen van crawl:', error);
     res.status(500).json({
       success: false,
-      message: 'Er is een fout opgetreden bij het stoppen van de crawl'
+      message: 'Er is een fout opgetreden bij het stoppen van de crawl',
+      error: error.message
+    });
+  }
+});
+
+// Start een test crawl voor debugging (alleen in development)
+router.post('/test-crawl', async (req, res) => {
+  try {
+    console.log('Test crawl route aangeroepen');
+    
+    // Controleer of de service en de methode bestaan
+    if (!puppeteerCrawlerService || typeof puppeteerCrawlerService.addTestCrawl !== 'function') {
+      console.error('puppeteerCrawlerService.addTestCrawl is niet beschikbaar');
+      return res.status(500).json({
+        success: false,
+        message: 'Interne serverfout: Test crawl functie niet beschikbaar'
+      });
+    }
+    
+    // Maak een test crawl aan die 30 seconden actief blijft
+    const sessionId = puppeteerCrawlerService.addTestCrawl();
+    
+    res.json({
+      success: true,
+      message: 'Test crawl gestart',
+      data: { sessionId }
+    });
+  } catch (error) {
+    console.error('Fout bij starten van test crawl:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Er is een fout opgetreden bij het starten van de test crawl',
+      error: error.message
     });
   }
 });

@@ -89,8 +89,13 @@ class PuppeteerCrawlerService {
     
     const crawlState = this.activeCrawls.get(sessionId);
     if (!crawlState) {
-      throw new Error(`Geen crawl gevonden met sessionId: ${sessionId}`);
+      console.error(`Kan crawl niet starten: geen crawlState gevonden voor sessie ${sessionId}`);
+      return;
     }
+    
+    // Update crawl status naar 'running'
+    crawlState.status = 'running';
+    console.log(`Crawl status bijgewerkt naar 'running' voor sessie ${sessionId}`);
     
     // Update browser configuratie op basis van instellingen
     const browserSettings = {
@@ -110,7 +115,6 @@ class PuppeteerCrawlerService {
     this.puppeteerManager.updateBrowserConfig(browserSettings);
 
     // Update crawl status
-    crawlState.status = 'running';
     this._updateProgress(sessionId);
     
     // Start de crawl in de achtergrond
@@ -331,50 +335,94 @@ class PuppeteerCrawlerService {
   async getActiveCrawls() {
     const activeCrawls = [];
     
+    // Debug: toon de huidige staat van de activeCrawls Map
+    console.log(`getActiveCrawls aangeroepen, huidige Map bevat ${this.activeCrawls.size} jobs:`, 
+      Array.from(this.activeCrawls.keys()));
+    
+    // ALTIJD alle crawls tonen, ongeacht status
+    const showAllCrawls = true;
+    
     // Converteer de Map naar een array met gedetailleerde informatie
     for (const [sessionId, crawlState] of this.activeCrawls.entries()) {
-      // Skip voltooide of mislukte crawls
-      if (crawlState.status === 'completed' || crawlState.status === 'failed') {
+      // Toon ook recent voltooide crawls (laatste 5 minuten) en mislukte crawls
+      const isRecentlyCompleted = crawlState.status === 'completed' && 
+        crawlState.endTime && 
+        (new Date() - crawlState.endTime) < 5 * 60 * 1000; // 5 minuten in milliseconden
+      
+      // Debug: log elke crawl die we tegenkomen
+      console.log(`Crawl gevonden: ${sessionId}, status: ${crawlState.status}, voltooiingstijd: ${crawlState.endTime}`);
+      
+      // Skip voltooide of mislukte crawls die niet recent zijn, tenzij we in debug modus zijn
+      if (!showAllCrawls && !isRecentlyCompleted && (crawlState.status === 'completed' || crawlState.status === 'failed')) {
+        console.log(`Crawl ${sessionId} is ${crawlState.status}, wordt overgeslagen`);
         continue;
       }
+      
+      console.log(`Crawl wordt toegevoegd aan response: ${sessionId}, status: ${crawlState.status}`);
       
       // Bereken de duur van de huidige crawl
       const currentDuration = Math.round((new Date() - crawlState.startTime) / 1000);
       
-      // Verzamel de top 5 meest recent bezochte URLs
-      const recentUrls = Array.from(crawlState.visitedUrls).slice(-5).reverse();
+      // Extra realtime informatie toevoegen
+      const lastActivityTime = crawlState.lastActivityTime || crawlState.startTime;
+      const timeSinceLastActivity = Math.round((new Date() - lastActivityTime) / 1000);
       
-      // Bereken gemiddelde verwerkingstijd per pagina, indien beschikbaar
-      const avgProcessingTime = crawlState.pagesCrawled > 0 
-        ? currentDuration / crawlState.pagesCrawled 
-        : 0;
+      // Converteer de Set naar een Array voor JSON-compatibiliteit
+      const visitedUrls = Array.from(crawlState.visitedUrls || []);
       
+      // Laatste URLs als lijst bewaren
+      const recentUrls = visitedUrls.slice(-5).reverse(); // Laatste 5 URLs in omgekeerde volgorde
+      
+      // Bereken statistieken
+      const uniqueLinks = visitedUrls.length;
+      const internalLinks = crawlState.stats?.internalLinks || 0;
+      const externalLinks = crawlState.stats?.externalLinks || 0;
+      const averageProcessingTime = crawlState.stats?.averageProcessingTime || 0;
+      
+      // Bepaal een beschrijvende activiteitsstatus
+      let activityStatus = 'Inactief';
+      if (crawlState.status === 'running') {
+        if (timeSinceLastActivity < 5) {
+          activityStatus = 'Actief bezig';
+        } else if (timeSinceLastActivity < 30) {
+          activityStatus = 'Recent actief';
+        } else {
+          activityStatus = 'Mogelijk vastgelopen';
+        }
+      } else if (crawlState.status === 'pending') {
+        activityStatus = 'Wachtend om te starten';
+      } else if (crawlState.status === 'completed') {
+        activityStatus = 'Voltooid';
+      } else if (crawlState.status === 'failed') {
+        activityStatus = 'Mislukt';
+      }
+      
+      // Voeg een object met gedetailleerde informatie toe aan de lijst
       activeCrawls.push({
         sessionId,
         vendorId: crawlState.vendorId,
         userId: crawlState.userId,
         status: crawlState.status,
-        progress: crawlState.progress || 0,
-        startTime: crawlState.startTime,
-        pagesCrawled: crawlState.pagesCrawled || 0,
-        maxPages: crawlState.maxPages,
-        currentDepth: crawlState.currentDepth || 0,
-        maxDepth: crawlState.maxDepth,
-        errors: crawlState.errors.length,
-        // Extra interessante informatie
-        duration: currentDuration,
-        avgProcessingTime: avgProcessingTime.toFixed(2),
-        recentUrls,
-        currentUrl: crawlState.currentUrl || null,
-        // Voeg start URLs en stealth mode toe
+        activityStatus, // Nieuwe beschrijvende status
         startUrls: crawlState.startUrls || [],
-        stealthMode: crawlState.stealthMode || false,
-        // Statistieken over gevonden content
-        statistics: {
-          totalLinks: crawlState.stats?.totalLinks || 0,
-          uniqueLinks: crawlState.stats?.uniqueLinks || 0,
-          internalLinks: crawlState.stats?.internalLinks || 0,
-          externalLinks: crawlState.stats?.externalLinks || 0
+        startTime: crawlState.startTime,
+        endTime: crawlState.endTime,
+        duration: currentDuration,
+        lastActivityTime,
+        timeSinceLastActivity,
+        progress: crawlState.progress || 0,
+        pagesCrawled: crawlState.pagesCrawled || 0,
+        maxPages: crawlState.settings?.maxPages || 100,
+        currentDepth: crawlState.currentDepth || 0,
+        maxDepth: crawlState.settings?.maxDepth || 3,
+        currentUrl: crawlState.currentUrl || null,
+        recentUrls,
+        errors: crawlState.errors?.length || 0,
+        stats: {
+          uniqueLinks,
+          internalLinks,
+          externalLinks,
+          averageProcessingTime
         }
       });
     }
@@ -424,6 +472,58 @@ class PuppeteerCrawlerService {
       stealthMode: crawlSettings.stealthMode,
       settings: crawlSettings
     });
+  }
+
+  /**
+   * Voeg een test crawl toe voor debug doeleinden
+   * @returns {String} Session ID van de test crawl
+   */
+  addTestCrawl() {
+    const sessionId = `test-${Date.now()}`;
+    const testCrawl = {
+      sessionId,
+      vendorId: 1,
+      userId: 'test-user',
+      status: 'running',
+      progress: 25,
+      pagesCrawled: 5,
+      totalPages: 20,
+      currentDepth: 1,
+      maxDepth: 3,
+      maxPages: 20,
+      startUrls: ['https://example.com'],
+      visitedUrls: new Set(['https://example.com', 'https://example.com/page1']),
+      results: [],
+      errors: [],
+      startTime: new Date(),
+      endTime: null,
+      settings: { maxDepth: 3, maxPages: 20 },
+      currentUrl: 'https://example.com/page2',
+      recentUrls: ['https://example.com', 'https://example.com/page1'],
+      stats: {
+        uniqueLinks: 10,
+        internalLinks: 8,
+        externalLinks: 2,
+        averageProcessingTime: 350
+      }
+    };
+    
+    this.activeCrawls.set(sessionId, testCrawl);
+    console.log(`Test crawl toegevoegd met ID: ${sessionId}`);
+    
+    // Maak de test crawl langdurig door pas na 30 seconden de status te wijzigen
+    setTimeout(() => {
+      console.log(`Test crawl ${sessionId} wordt gemarkeerd als voltooid na 30 seconden`);
+      const crawl = this.activeCrawls.get(sessionId);
+      if (crawl) {
+        crawl.status = 'completed';
+        crawl.endTime = new Date();
+        crawl.progress = 100;
+        crawl.pagesCrawled = crawl.maxPages;
+      }
+    }, 30000);
+    
+    return sessionId;
   }
 }
 

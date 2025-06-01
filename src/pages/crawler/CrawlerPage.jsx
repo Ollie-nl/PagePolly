@@ -85,9 +85,19 @@ const CrawlerPage = () => {
     
     setStatusMessage('Starten met crawlen...');
     
-    // We gebruiken de Redux thunk met de settings ID
-    // De API zal de website URL ophalen op basis van deze ID
-    dispatch(startCrawl(settings.id));
+    // Bereid de crawl parameters voor inclusief configuratie-instellingen
+    const crawlParams = {
+      vendorId: settings.id,
+      startUrls: [settings.website],
+      maxDepth: crawlConfig.maxDepth,
+      maxPages: crawlConfig.maxPages,
+      stealthMode: crawlConfig.stealthMode
+    };
+    
+    console.log('Starten crawl met parameters:', crawlParams);
+    
+    // Start de crawl met de volledige parameters
+    dispatch(startCrawl(crawlParams));
   };
   
   const handleStopCrawl = async () => {

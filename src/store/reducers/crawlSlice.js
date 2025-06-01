@@ -92,6 +92,31 @@ export const getActiveCrawls = createAsyncThunk(
       // Gebruik de nieuwe API methode om actieve crawls op te halen
       const activeCrawls = await puppeteerCrawlerApi.getActiveCrawls();
       console.log('Actieve crawls opgehaald in thunk:', activeCrawls);
+      
+      // DEBUG: Voeg tijdelijke test crawl toe als er geen actieve crawls zijn
+      if (Array.isArray(activeCrawls) && activeCrawls.length === 0) {
+        console.log('GEEN ACTIEVE CRAWLS GEVONDEN, debuggen met test data');
+        return [{
+          sessionId: 'test-' + Date.now(),
+          vendorId: 999,
+          status: 'running',
+          startUrls: ['https://testurl.com'],
+          pagesCrawled: 5,
+          maxPages: 50,
+          currentDepth: 2,
+          maxDepth: 5,
+          progress: 35,
+          recentUrls: ['https://testurl.com/page1', 'https://testurl.com/page2'],
+          errors: 0,
+          stats: {
+            uniqueLinks: 15,
+            internalLinks: 12,
+            externalLinks: 3,
+            averageProcessingTime: 450
+          }
+        }];
+      }
+      
       return activeCrawls;
     } catch (error) {
       console.error('Fout bij ophalen actieve crawls:', error);
