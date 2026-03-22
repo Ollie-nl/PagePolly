@@ -19,12 +19,13 @@ class CrawlService {
    * @param {Array<string>} urls - URLs to crawl
    * @returns {Object} - The job details
    */
-  async startCrawl(vendorId, userId, urls, settings = {}) {
+  async startCrawl(vendorId, userId, userEmail, urls, settings = {}) {
     const jobId = uuidv4();
     const job = {
       id: jobId,
       vendorId,
       userId,
+      userEmail,
       urls,
       settings,
       status: 'pending',
@@ -69,16 +70,26 @@ class CrawlService {
       // Process each URL
       const results = [];
       for (let i = 0; i < job.urls.length; i++) {
-        if (job.status === 'cancelled') {
-          break;
-        }
+        if (job.status === 'cancelled') break;
 
         const url = job.urls[i];
+        const startTime = Date.now();
         try {
           const result = await this.crawlSinglePage(browser, url);
+          const crawlDuration = Date.now() - startTime;
+
+          // Store individual result in database
+          await db.storeCrawlResult({
+            jobId,
+            vendorId: job.vendorId,
+            url,
+            status: 'success',
+            data: result.data,
+            crawlDuration,
+            retryCount: 0,
+          });
+
           results.push({ url, ...result });
-          
-          // Update progress
           const progress = Math.floor(((i + 1) / job.urls.length) * 100);
           this.updateJobProgress(jobId, progress);
         } catch (error) {
@@ -90,17 +101,13 @@ class CrawlService {
       // Close browser
       await browser.close();
 
-      // Store results if job wasn't cancelled
       if (job.status !== 'cancelled') {
         job.results = results;
         job.completionTime = new Date();
         job.status = 'completed';
-        
-        // Save final results to database
         await db.updateCrawlJob(jobId, {
           status: 'completed',
           progress: 100,
-          results,
           completionTime: job.completionTime
         });
       }
@@ -148,92 +155,55 @@ class CrawlService {
       // Wait for content to load
       await page.waitForSelector('body', { timeout: 5000 });
 
-      // Extract page information
+      // Extract clean text content — no HTML, no images, no positions
       const pageData = await page.evaluate(() => {
-        const extractElementData = (element) => {
-          const rect = element.getBoundingClientRect();
-          return {
-            tag: element.tagName.toLowerCase(),
-            type: element.type || null,
-            text: element.innerText || null,
-            html: element.innerHTML,
-            attributes: Array.from(element.attributes).reduce((obj, attr) => {
-              obj[attr.name] = attr.value;
-              return obj;
-            }, {}),
-            position: {
-              x: rect.left,
-              y: rect.top,
-              width: rect.width,
-              height: rect.height,
-            },
-            isVisible: !(rect.width === 0 || 
-                       rect.height === 0 || 
-                       window.getComputedStyle(element).visibility === 'hidden' ||
-                       window.getComputedStyle(element).display === 'none'),
-            zIndex: window.getComputedStyle(element).zIndex,
-          };
+        const clean = (el) => (el?.innerText || el?.textContent || '').trim();
+        const unique = (arr) => [...new Set(arr.filter(Boolean))];
+
+        // Meta
+        const title       = document.title || '';
+        const description = document.querySelector('meta[name="description"]')?.content?.trim() || '';
+        const keywords    = document.querySelector('meta[name="keywords"]')?.content?.trim() || '';
+        const canonical   = document.querySelector('link[rel="canonical"]')?.href || window.location.href;
+        const lang        = document.documentElement.lang || '';
+
+        // Headings as clean text
+        const headings = {
+          h1: unique(Array.from(document.querySelectorAll('h1')).map(clean)),
+          h2: unique(Array.from(document.querySelectorAll('h2')).map(clean)),
+          h3: unique(Array.from(document.querySelectorAll('h3')).map(clean)),
         };
 
-        const title = document.title;
-        
-        // Extract product elements (this can be customized based on needs)
-        const products = Array.from(document.querySelectorAll('.product, [data-product], [class*="product"], [id*="product"]'))
-          .map(extractElementData);
-          
-        // Extract navigation elements
-        const navElements = Array.from(document.querySelectorAll('nav, [role="navigation"], .navigation, .menu'))
-          .map(extractElementData);
-          
-        // Extract heading elements for structure
-        const headings = Array.from(document.querySelectorAll('h1, h2, h3'))
-          .map(extractElementData);
-        
-        // Extract links
+        // Paragraphs — skip very short/empty ones
+        const paragraphs = unique(
+          Array.from(document.querySelectorAll('p'))
+            .map(clean)
+            .filter(t => t.length > 20)
+        );
+
+        // Links — deduplicate by href, keep anchor text
+        const seen = new Set();
         const links = Array.from(document.querySelectorAll('a[href]'))
-          .map(element => ({
-            ...extractElementData(element),
-            href: element.href
-          }));
-
-        // Get document metadata
-        const metadata = {
-          title: document.title,
-          description: document.querySelector('meta[name="description"]')?.content || '',
-          keywords: document.querySelector('meta[name="keywords"]')?.content || '',
-        };
+          .map(a => ({ href: a.href, text: clean(a) }))
+          .filter(({ href, text }) => {
+            if (!href.startsWith('http') || seen.has(href)) return false;
+            seen.add(href);
+            return true;
+          });
 
         return {
+          url:         canonical,
           title,
-          url: window.location.href,
-          time: new Date().toISOString(),
-          metadata,
-          structure: {
-            products,
-            navElements,
-            headings,
-            links,
-          }
+          meta:        { description, keywords, lang },
+          headings,
+          paragraphs,
+          links,
+          crawledAt:   new Date().toISOString(),
         };
       });
       
-      // Take a screenshot
-      const screenshot = await page.screenshot({ 
-        fullPage: true,
-        encoding: 'base64',
-        quality: 80,
-        type: 'jpeg'
-      });
-      
-      // Close the page
       await page.close();
-      
-      // Return the collected data
-      return { 
-        data: pageData, 
-        screenshot: `data:image/jpeg;base64,${screenshot}`,
-        timestamp: new Date()
-      };
+      return { data: pageData };
     } catch (error) {
       await page.close();
       throw error;

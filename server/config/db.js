@@ -19,13 +19,14 @@ const db = {
   // ── Crawl Jobs ──────────────────────────────────────────────
 
   async createCrawlJob(job) {
-    const { id, userId, vendorId, urls, status, progress, settings } = job;
+    const { id, userId, userEmail, vendorId, urls, status, progress, settings } = job;
     const { data, error } = await supabase
       .from('crawl_jobs')
       .insert({
         id,
-        user_email: userId,
-        vendor_id: vendorId || null,
+        user_id:    userId,
+        user_email: userEmail || userId,
+        vendor_id:  vendorId || null,
         urls,
         status,
         progress,

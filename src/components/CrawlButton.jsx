@@ -1,59 +1,107 @@
 // CrawlButton.jsx
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PuppeteerCrawlOption from './PuppeteerCrawlOption';
 import supabaseClient from '../lib/supabaseClient';
 
+const STATUS_LABELS = {
+  pending:   'Waiting to start...',
+  running:   'Crawling...',
+  completed: 'Completed',
+  failed:    'Failed',
+  cancelled: 'Cancelled',
+};
+
 const CrawlButton = ({ vendorId, onCrawlComplete }) => {
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [phase, setPhase] = useState('config'); // 'config' | 'running' | 'done'
   const [error, setError] = useState(null);
+  const [jobStatus, setJobStatus] = useState(null); // { status, progress }
   const [puppeteerSettings, setPuppeteerSettings] = useState({
     simulateHumanBehavior: true,
-    takeScreenshots: true,
     maxRetries: 3,
     waitTime: 2000,
   });
+  const pollRef = useRef(null);
 
-  const handleOpen = () => setOpen(true);
-  const handleClose = () => {
-    setOpen(false);
+  // Stop polling on unmount
+  useEffect(() => () => clearInterval(pollRef.current), []);
+
+  const stopPolling = () => {
+    clearInterval(pollRef.current);
+    pollRef.current = null;
+  };
+
+  const startPolling = (jobId, token) => {
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/crawls/${jobId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!res.ok) return;
+        const job = await res.json();
+
+        setJobStatus({ status: job.status, progress: job.progress ?? 0 });
+
+        if (['completed', 'failed', 'cancelled'].includes(job.status)) {
+          stopPolling();
+          setPhase('done');
+          onCrawlComplete?.(job);
+        }
+      } catch {
+        // silently ignore poll errors
+      }
+    }, 2000);
+  };
+
+  const handleOpen = () => {
+    setOpen(true);
+    setPhase('config');
     setError(null);
+    setJobStatus(null);
+  };
+
+  const handleClose = () => {
+    stopPolling();
+    setOpen(false);
+    setPhase('config');
+    setError(null);
+    setJobStatus(null);
   };
 
   const handleStartCrawl = async () => {
-    setLoading(true);
     setError(null);
+    setPhase('running');
+    setJobStatus({ status: 'pending', progress: 0 });
 
     try {
-      const { data: { user } } = await supabaseClient.auth.getUser();
       const { data: { session } } = await supabaseClient.auth.getSession();
+      const token = session?.access_token;
 
       const response = await fetch('/api/crawls', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          vendorId,
-          settings: puppeteerSettings,
-          user_email: user.email
-        }),
+        body: JSON.stringify({ vendorId, settings: puppeteerSettings }),
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.message || `HTTP ${response.status}`);
       }
 
-      const data = await response.json();
-      onCrawlComplete?.(data);
-      handleClose();
+      const { id: jobId } = await response.json();
+      startPolling(jobId, token);
     } catch (err) {
       setError(err.message);
-    } finally {
-      setLoading(false);
+      setPhase('config');
+      setJobStatus(null);
     }
   };
+
+  const progress = jobStatus?.progress ?? 0;
+  const status   = jobStatus?.status ?? 'pending';
 
   return (
     <>
@@ -62,39 +110,69 @@ const CrawlButton = ({ vendorId, onCrawlComplete }) => {
       </button>
 
       {open && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Configure Crawl">
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Crawl">
           <div className="modal">
             <div className="modal-header">
-              <h3>Configure Crawl</h3>
-              <button className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
+              <h3>{phase === 'config' ? 'Configure Crawl' : 'Crawl Progress'}</h3>
+              {phase !== 'running' && (
+                <button className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
+              )}
             </div>
 
             <div className="modal-body">
-              {error && (
-                <div className="alert alert-error mb-md">
-                  {error}
+              {error && <div className="alert alert-error mb-md">{error}</div>}
+
+              {phase === 'config' && (
+                <PuppeteerCrawlOption
+                  settings={puppeteerSettings}
+                  onSettingsChange={setPuppeteerSettings}
+                />
+              )}
+
+              {(phase === 'running' || phase === 'done') && (
+                <div>
+                  <p className="text-sm text-muted mb-sm">
+                    {STATUS_LABELS[status] || status}
+                  </p>
+
+                  <div className="progress">
+                    <div
+                      className="progress-bar"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                  <p className="text-sm text-muted mt-xs text-right">{progress}%</p>
+
+                  {phase === 'done' && status === 'completed' && (
+                    <div className="alert alert-success mt-md">
+                      Crawl completed successfully.
+                    </div>
+                  )}
+                  {phase === 'done' && status === 'failed' && (
+                    <div className="alert alert-error mt-md">
+                      Crawl failed. Check the reports for details.
+                    </div>
+                  )}
                 </div>
               )}
-              <PuppeteerCrawlOption
-                settings={puppeteerSettings}
-                onSettingsChange={setPuppeteerSettings}
-                disabled={loading}
-              />
             </div>
 
             <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={handleClose} disabled={loading}>
-                Cancel
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleStartCrawl}
-                disabled={loading}
-              >
-                {loading ? (
-                  <><span className="spinner spinner-sm spinner-inline" />Starting...</>
-                ) : 'Start Crawl'}
-              </button>
+              {phase === 'config' && (
+                <>
+                  <button className="btn btn-secondary" onClick={handleClose}>
+                    Cancel
+                  </button>
+                  <button className="btn btn-primary" onClick={handleStartCrawl}>
+                    Start Crawl
+                  </button>
+                </>
+              )}
+              {phase === 'done' && (
+                <button className="btn btn-primary" onClick={handleClose}>
+                  Close
+                </button>
+              )}
             </div>
           </div>
         </div>

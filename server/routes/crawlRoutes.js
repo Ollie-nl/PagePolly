@@ -10,13 +10,13 @@ const crawlService = require('../services/crawlService');
 router.post('/', async (req, res, next) => {
   try {
     const { vendorId, settings } = req.body;
-    const userId = req.user.id;
+    const userId    = req.user.id;
+    const userEmail = req.user.email;
 
     if (!vendorId) {
       return res.status(400).json({ error: 'Invalid request', message: 'vendorId is required' });
     }
 
-    // Look up vendor to get the URL
     const db = require('../config/db');
     const vendor = await db.getVendor(vendorId);
     if (!vendor) {
@@ -26,7 +26,7 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ error: 'Invalid vendor', message: 'Vendor has no URL configured' });
     }
 
-    const job = await crawlService.startCrawl(vendorId, userId, [vendor.url], settings);
+    const job = await crawlService.startCrawl(vendorId, userId, userEmail, [vendor.url], settings);
 
     res.status(201).json({
       message: 'Crawl job started successfully',
@@ -149,17 +149,17 @@ router.get('/:jobId', async (req, res, next) => {
  */
 router.get('/', async (req, res, next) => {
   try {
-    const userId = req.user.id; // From auth middleware
-    const { projectId, status, limit = 10, page = 1 } = req.query;
-    
+    const userEmail = req.user.email;
+    const { vendorId, status, limit = 10, page = 1 } = req.query;
+
     const filters = {
-      projectId,
+      vendorId,
       status,
       limit: parseInt(limit, 10),
-      page: parseInt(page, 10)
+      offset: (parseInt(page, 10) - 1) * parseInt(limit, 10)
     };
-    
-    const history = await crawlService.getCrawlHistory(userId, filters);
+
+    const history = await crawlService.getCrawlHistory(userEmail, filters);
     
     res.json(history);
   } catch (error) {
