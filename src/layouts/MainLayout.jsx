@@ -1,44 +1,21 @@
 // MainLayout.jsx
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Drawer,
-  AppBar,
-  Toolbar,
-  List,
-  Typography,
-  Divider,
-  IconButton,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Button,
-  useTheme
-} from '@mui/material';
-import {
-  Menu as MenuIcon,
-  Dashboard as DashboardIcon,
-  Settings as SettingsIcon,
-  BugReport as TestIcon,
-  Store as VendorsIcon,
-  Assessment as ReportsIcon,
-  ExitToApp as LogoutIcon
-} from '@mui/icons-material';
 import { useAuth } from '../hooks/useAuth';
 import supabaseClient from '../lib/supabaseClient';
 
-const drawerWidth = 240;
+const menuItems = [
+  { text: 'Dashboard',    icon: '🏠', path: '/' },
+  { text: 'Vendors',      icon: '🏪', path: '/vendors' },
+  { text: 'Reports',      icon: '📊', path: '/reports' },
+  { text: 'Test Crawler', icon: '🐛', path: '/test-crawler' },
+  { text: 'Settings',     icon: '⚙️', path: '/settings' },
+];
 
 const MainLayout = () => {
-  const [mobileOpen, setMobileOpen] = React.useState(false);
-  const theme = useTheme();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
-
-  const handleDrawerToggle = () => {
-    setMobileOpen(!mobileOpen);
-  };
 
   const handleLogout = async () => {
     try {
@@ -49,123 +26,82 @@ const MainLayout = () => {
     }
   };
 
-  const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-    { text: 'Vendors', icon: <VendorsIcon />, path: '/vendors' },
-    { text: 'Reports', icon: <ReportsIcon />, path: '/reports' },
-    { text: 'Test Crawler', icon: <TestIcon />, path: '/test-crawler' },
-    { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
-  ];
-
-  const drawer = (
-    <div>
-      <Toolbar>
-        <Typography variant="h6" noWrap component="div">
-          PagePolly
-        </Typography>
-      </Toolbar>
-      <Divider />
-      <List>
-        {menuItems.map((item) => (
-          <ListItem
-            button
-            key={item.text}
-            component={NavLink}
-            to={item.path}
-            sx={{
-              '&.active': {
-                backgroundColor: theme.palette.action.selected,
-              },
-            }}
-          >
-            <ListItemIcon>{item.icon}</ListItemIcon>
-            <ListItemText primary={item.text} />
-          </ListItem>
-        ))}
-      </List>
-      <Divider />
-      <List>
-        <ListItem button onClick={handleLogout}>
-          <ListItemIcon>
-            <LogoutIcon />
-          </ListItemIcon>
-          <ListItemText primary="Logout" />
-        </ListItem>
-      </List>
-    </div>
-  );
+  const closeSidebar = () => setSidebarOpen(false);
 
   return (
-    <Box sx={{ display: 'flex' }}>
-      <AppBar
-        position="fixed"
-        sx={{
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          ml: { sm: `${drawerWidth}px` },
-        }}
-      >
-        <Toolbar>
-          <IconButton
-            color="inherit"
-            edge="start"
-            onClick={handleDrawerToggle}
-            sx={{ mr: 2, display: { sm: 'none' } }}
+    <div className="app-shell">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="sidebar-overlay open"
+          onClick={closeSidebar}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`sidebar${sidebarOpen ? ' open' : ''}`}>
+        <div className="sidebar-logo">
+          PagePolly
+        </div>
+
+        <nav className="sidebar-nav">
+          {menuItems.map((item) => (
+            <NavLink
+              key={item.text}
+              to={item.path}
+              end={item.path === '/'}
+              className={({ isActive }) =>
+                `sidebar-nav-link${isActive ? ' active' : ''}`
+              }
+              onClick={closeSidebar}
+            >
+              <span className="sidebar-nav-icon" aria-hidden="true">{item.icon}</span>
+              {item.text}
+            </NavLink>
+          ))}
+        </nav>
+
+        <hr className="sidebar-divider" />
+
+        <div className="sidebar-footer">
+          <button
+            className="sidebar-nav-link btn-ghost"
+            style={{ width: '100%', color: 'var(--color-gray-300)' }}
+            onClick={handleLogout}
           >
-            <MenuIcon />
-          </IconButton>
-          <Box sx={{ flexGrow: 1 }}>
-            <Typography variant="h6" noWrap component="div">
-              {user?.email}
-            </Typography>
-          </Box>
-          <Button color="inherit" onClick={handleLogout}>
+            <span className="sidebar-nav-icon" aria-hidden="true">↩</span>
             Logout
-          </Button>
-        </Toolbar>
-      </AppBar>
-      
-      <Box
-        component="nav"
-        sx={{ width: { sm: drawerWidth }, flexShrink: { sm: 0 } }}
-      >
-        <Drawer
-          variant="temporary"
-          open={mobileOpen}
-          onClose={handleDrawerToggle}
-          ModalProps={{
-            keepMounted: true, // Better open performance on mobile.
-          }}
-          sx={{
-            display: { xs: 'block', sm: 'none' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
-          }}
-        >
-          {drawer}
-        </Drawer>
-        <Drawer
-          variant="permanent"
-          sx={{
-            display: { xs: 'none', sm: 'block' },
-            '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth },
-          }}
-          open
-        >
-          {drawer}
-        </Drawer>
-      </Box>
-      
-      <Box
-        component="main"
-        sx={{
-          flexGrow: 1,
-          p: 3,
-          width: { sm: `calc(100% - ${drawerWidth}px)` },
-          mt: 8
-        }}
-      >
+          </button>
+        </div>
+      </aside>
+
+      {/* Top bar */}
+      <header className="topbar">
+        <div className="topbar-left">
+          <button
+            className="mobile-menu-btn"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label="Toggle sidebar"
+          >
+            ☰
+          </button>
+        </div>
+        <div className="topbar-right">
+          {user?.email && (
+            <span className="topbar-user">{user.email}</span>
+          )}
+          <button className="btn btn-secondary btn-sm" onClick={handleLogout}>
+            Logout
+          </button>
+        </div>
+      </header>
+
+      {/* Page content */}
+      <main className="main-content">
         <Outlet />
-      </Box>
-    </Box>
+      </main>
+    </div>
   );
 };
 

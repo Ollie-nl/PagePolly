@@ -1,14 +1,5 @@
 // CrawlButton.jsx
 import React, { useState } from 'react';
-import {
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  CircularProgress,
-  Alert
-} from '@mui/material';
 import PuppeteerCrawlOption from './PuppeteerCrawlOption';
 import supabaseClient from '../lib/supabaseClient';
 
@@ -65,36 +56,48 @@ const CrawlButton = ({ vendorId, onCrawlComplete }) => {
 
   return (
     <>
-      <Button variant="contained" color="primary" onClick={handleOpen} size="small">
+      <button className="btn btn-primary btn-sm" onClick={handleOpen}>
         Crawl
-      </Button>
+      </button>
 
-      <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
-        <DialogTitle>Configure Crawl</DialogTitle>
-        <DialogContent>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-          <PuppeteerCrawlOption
-            settings={puppeteerSettings}
-            onSettingsChange={setPuppeteerSettings}
-            disabled={loading}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleClose} disabled={loading}>Cancel</Button>
-          <Button
-            onClick={handleStartCrawl}
-            variant="contained"
-            disabled={loading}
-            startIcon={loading ? <CircularProgress size={20} /> : null}
-          >
-            {loading ? 'Starting...' : 'Start Crawl'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {open && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" aria-label="Configure Crawl">
+          <div className="modal">
+            <div className="modal-header">
+              <h3>Configure Crawl</h3>
+              <button className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
+            </div>
+
+            <div className="modal-body">
+              {error && (
+                <div className="alert alert-error mb-md">
+                  {error}
+                </div>
+              )}
+              <PuppeteerCrawlOption
+                settings={puppeteerSettings}
+                onSettingsChange={setPuppeteerSettings}
+                disabled={loading}
+              />
+            </div>
+
+            <div className="modal-footer">
+              <button className="btn btn-secondary" onClick={handleClose} disabled={loading}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleStartCrawl}
+                disabled={loading}
+              >
+                {loading ? (
+                  <><span className="spinner spinner-sm spinner-inline" />Starting...</>
+                ) : 'Start Crawl'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

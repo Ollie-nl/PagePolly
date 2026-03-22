@@ -1,33 +1,5 @@
 // CrawlerInterface.jsx
 import React, { useState, useEffect } from 'react';
-import {
-  Box,
-  Button,
-  Card,
-  CardContent,
-  TextField,
-  Typography,
-  LinearProgress,
-  Alert,
-  Stack,
-  List,
-  ListItem,
-  ListItemText,
-  Chip,
-  Divider,
-  IconButton,
-  Paper,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails
-} from '@mui/material';
-import {
-  Add as AddIcon,
-  Delete as DeleteIcon,
-  ExpandMore as ExpandMoreIcon,
-  Refresh as RefreshIcon,
-  CancelOutlined as CancelIcon
-} from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
 import {
   startCrawl,
@@ -37,6 +9,14 @@ import {
   clearCrawlState
 } from '../../store/reducers/crawlSlice';
 import PuppeteerCrawlOption from '../PuppeteerCrawlOption';
+
+const statusBadgeClass = {
+  pending:   'badge-warning',
+  running:   'badge-info',
+  completed: 'badge-success',
+  failed:    'badge-error',
+  cancelled: 'badge-default',
+};
 
 const CrawlerInterface = ({ projectId }) => {
   const dispatch = useDispatch();
@@ -50,13 +30,11 @@ const CrawlerInterface = ({ projectId }) => {
   });
 
   const crawlState = useSelector((state) => state.crawl);
-  const { activeJob, history, selectedJob, loading } = crawlState;
+  const { activeJob, history, loading } = crawlState;
 
   useEffect(() => {
     dispatch(getCrawlHistory({ projectId }));
-    return () => {
-      dispatch(clearCrawlState());
-    };
+    return () => { dispatch(clearCrawlState()); };
   }, [dispatch, projectId]);
 
   useEffect(() => {
@@ -66,9 +44,7 @@ const CrawlerInterface = ({ projectId }) => {
         dispatch(getCrawlDetails(activeJob.id));
       }, 5000);
     }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
+    return () => { if (interval) clearInterval(interval); };
   }, [dispatch, activeJob]);
 
   const handleUrlChange = (index, value) => {
@@ -112,146 +88,150 @@ const CrawlerInterface = ({ projectId }) => {
     dispatch(getCrawlHistory({ projectId }));
   };
 
-  const renderStatusChip = (status) => {
-    const colors = {
-      pending: 'warning',
-      running: 'info',
-      completed: 'success',
-      failed: 'error',
-      cancelled: 'default'
-    };
-    return <Chip label={status} color={colors[status] || 'default'} size="small" />;
-  };
-
   return (
-    <Box>
-      <Card sx={{ mb: 4 }}>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Start New Crawl
-          </Typography>
-
+    <div>
+      {/* New Crawl card */}
+      <div className="card mb-lg">
+        <div className="card-header">
+          <h2 className="h3">Start New Crawl</h2>
+        </div>
+        <div className="card-body">
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <div className="alert alert-error">
               {error}
-            </Alert>
+            </div>
           )}
 
-          <Stack spacing={2}>
+          <div className="mb-md">
             <PuppeteerCrawlOption
               settings={puppeteerSettings}
               onSettingsChange={setPuppeteerSettings}
               disabled={loading}
             />
+          </div>
 
-            {urls.map((url, index) => (
-              <Box key={index} sx={{ display: 'flex', alignItems: 'center' }}>
-                <TextField
-                  fullWidth
-                  label={`URL ${index + 1}`}
-                  value={url}
-                  onChange={(e) => handleUrlChange(index, e.target.value)}
-                  placeholder="https://example.com"
-                  disabled={loading}
-                  variant="outlined"
-                  size="small"
-                />
-                <IconButton
-                  onClick={() => removeUrlField(index)}
-                  disabled={urls.length === 1 || loading}
-                  sx={{ ml: 1 }}
-                >
-                  <DeleteIcon />
-                </IconButton>
-              </Box>
-            ))}
-
-            <Box>
-              <Button
-                startIcon={<AddIcon />}
-                onClick={addUrlField}
+          {urls.map((url, index) => (
+            <div key={index} className="flex items-center gap-sm mb-sm">
+              <input
+                className="input"
+                type="url"
+                value={url}
+                onChange={(e) => handleUrlChange(index, e.target.value)}
+                placeholder={`URL ${index + 1} — https://example.com`}
                 disabled={loading}
-                size="small"
+              />
+              <button
+                className="btn-icon"
+                onClick={() => removeUrlField(index)}
+                disabled={urls.length === 1 || loading}
+                aria-label="Remove URL"
+                title="Remove URL"
               >
-                Add URL
-              </Button>
-            </Box>
+                &times;
+              </button>
+            </div>
+          ))}
 
-            <Box>
-              <Button
-                variant="contained"
-                onClick={handleStartCrawl}
-                disabled={loading || (activeJob && ['pending', 'running'].includes(activeJob.status))}
-              >
-                Start Crawling
-              </Button>
-            </Box>
-          </Stack>
-        </CardContent>
-      </Card>
+          <div className="flex gap-sm mt-md">
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={addUrlField}
+              disabled={loading}
+            >
+              + Add URL
+            </button>
 
+            <button
+              className="btn btn-primary"
+              onClick={handleStartCrawl}
+              disabled={loading || (activeJob && ['pending', 'running'].includes(activeJob.status))}
+            >
+              {loading ? (
+                <><span className="spinner spinner-sm spinner-inline" />Starting...</>
+              ) : 'Start Crawling'}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Active job */}
       {activeJob && (
-        <Card sx={{ mb: 4 }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6">Active Job</Typography>
-              {renderStatusChip(activeJob.status)}
-            </Box>
-            <LinearProgress
-              variant="determinate"
-              value={activeJob.progress || 0}
-              sx={{ mb: 1 }}
-            />
-            <Typography variant="body2" color="text.secondary">
-              {activeJob.progress || 0}% complete
-            </Typography>
+        <div className="card mb-lg">
+          <div className="card-header">
+            <h2 className="h3">Active Job</h2>
+            <span className={`badge ${statusBadgeClass[activeJob.status] || 'badge-default'}`}>
+              {activeJob.status}
+            </span>
+          </div>
+          <div className="card-body">
+            <div className="progress mb-sm">
+              <div
+                className="progress-bar"
+                style={{ width: `${activeJob.progress || 0}%` }}
+              />
+            </div>
+            <p className="text-sm text-muted mb-md">{activeJob.progress || 0}% complete</p>
+
             {['pending', 'running'].includes(activeJob.status) && (
-              <Button
-                startIcon={<CancelIcon />}
+              <button
+                className="btn btn-danger btn-sm"
                 onClick={handleCancelCrawl}
-                color="error"
-                size="small"
-                sx={{ mt: 2 }}
               >
-                Cancel
-              </Button>
+                &times; Cancel
+              </button>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       )}
 
+      {/* Crawl History */}
       {history && history.length > 0 && (
-        <Card>
-          <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6">Crawl History</Typography>
-              <Button startIcon={<RefreshIcon />} onClick={handleRefreshHistory} size="small">
-                Refresh
-              </Button>
-            </Box>
-            <List>
-              {history.map((job, index) => (
-                <React.Fragment key={job.id}>
-                  {index > 0 && <Divider />}
-                  <ListItem
-                    secondaryAction={
-                      <Button size="small" onClick={() => handleViewJobDetails(job.id)}>
+        <div className="card">
+          <div className="card-header">
+            <h2 className="h3">Crawl History</h2>
+            <button
+              className="btn btn-secondary btn-sm"
+              onClick={handleRefreshHistory}
+            >
+              ↺ Refresh
+            </button>
+          </div>
+          <div className="table-wrapper">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Started</th>
+                  <th className="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {history.map((job) => (
+                  <tr key={job.id}>
+                    <td>
+                      <span className={`badge ${statusBadgeClass[job.status] || 'badge-default'}`}>
+                        {job.status}
+                      </span>
+                    </td>
+                    <td className="text-muted text-sm">
+                      {new Date(job.startTime).toLocaleString()}
+                    </td>
+                    <td className="table-cell-actions">
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => handleViewJobDetails(job.id)}
+                      >
                         Details
-                      </Button>
-                    }
-                  >
-                    <ListItemText
-                      primary={<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>{renderStatusChip(job.status)}</Box>}
-                      secondary={new Date(job.startTime).toLocaleString()}
-                    />
-                  </ListItem>
-                </React.Fragment>
-              ))}
-            </List>
-          </CardContent>
-        </Card>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       )}
-    </Box>
+    </div>
   );
 };
 

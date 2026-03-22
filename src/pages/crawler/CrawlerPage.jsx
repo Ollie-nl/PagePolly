@@ -55,69 +55,89 @@ const CrawlerPage = () => {
     }
   };
 
+  const statusClass = {
+    running:   'badge-info',
+    completed: 'badge-success',
+    failed:    'badge-error',
+  }[crawlStatus] || 'badge-default';
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+    <div>
+      <div className="page-header">
+        <div className="page-header-text">
+          <h1>Crawler</h1>
+          <p>Project ID: {projectId}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-2 gap-lg">
+        {/* Left: settings + controls */}
         <div>
           <CrawlerSettings vendorId={projectId} />
-          
+
           {error && (
-            <div className="mt-4 p-4 bg-red-100 text-red-700 rounded">
+            <div className="alert alert-error mt-md">
               {error}
             </div>
           )}
 
-          <div className="mt-8 space-y-4">
+          <div className="flex flex-col gap-sm mt-lg">
             <button
+              className="btn btn-primary btn-lg btn-full"
               onClick={handleStartCrawl}
               disabled={crawlStatus === 'running' || !settings}
-              className="w-full py-2 px-4 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-400"
             >
-              Start Crawl
+              ▶ Start Crawl
             </button>
-            
+
             {crawlStatus === 'running' && (
               <button
+                className="btn btn-danger btn-full"
                 onClick={handleStopCrawl}
-                className="w-full py-2 px-4 bg-red-600 text-white rounded hover:bg-red-700"
               >
-                Stop Crawl
+                ■ Stop Crawl
               </button>
             )}
           </div>
         </div>
 
+        {/* Right: results */}
         <div>
-          <h2 className="text-2xl font-bold mb-4">Crawl Results</h2>
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="mb-4">
-              <span className="font-semibold">Status: </span>
-              <span className={`
-                ${crawlStatus === 'running' ? 'text-blue-600' : ''}
-                ${crawlStatus === 'completed' ? 'text-green-600' : ''}
-                ${crawlStatus === 'failed' ? 'text-red-600' : ''}
-              `}>
+          <div className="card">
+            <div className="card-header">
+              <h2 className="h3">Crawl Results</h2>
+              <span className={`badge ${statusClass}`}>
                 {crawlStatus.charAt(0).toUpperCase() + crawlStatus.slice(1)}
               </span>
             </div>
 
-            {crawlResults.length > 0 ? (
-              <div className="space-y-4">
-                {crawlResults.map((result) => (
-                  <div key={result.id} className="border-b pb-4">
-                    <h3 className="font-medium text-lg">{result.title || 'Untitled'}</h3>
-                    <a href={result.url} className="text-blue-600 hover:underline text-sm" target="_blank" rel="noopener noreferrer">
-                      {result.url}
-                    </a>
-                    {result.description && (
-                      <p className="text-gray-600 mt-2">{result.description}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-gray-500">No results available yet.</p>
-            )}
+            <div className="card-body">
+              {crawlResults.length > 0 ? (
+                <div>
+                  {crawlResults.map((result) => (
+                    <div key={result.id} className="result-item">
+                      <h3 className="h5">{result.title || 'Untitled'}</h3>
+                      <a
+                        href={result.url}
+                        className="text-sm"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {result.url}
+                      </a>
+                      {result.description && (
+                        <p className="text-muted text-sm mt-xs">{result.description}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="empty-state" style={{ padding: 'var(--spacing-xl) 0' }}>
+                  <div className="empty-state-icon">🔍</div>
+                  <p>No results available yet.</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

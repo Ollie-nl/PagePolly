@@ -1,16 +1,5 @@
 // TestCrawler.jsx
 import React, { useState } from 'react';
-import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  TextField,
-  Button,
-  Alert,
-  LinearProgress,
-  Paper
-} from '@mui/material';
 import PuppeteerCrawlOption from './PuppeteerCrawlOption';
 import supabaseClient from '../lib/supabaseClient';
 import { crawlerClient } from '../api/crawlerApi';
@@ -61,83 +50,79 @@ const TestCrawler = () => {
   };
 
   return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', p: 3 }}>
-      <Card>
-        <CardContent>
-          <Typography variant="h5" gutterBottom>
-            Test Crawler
-          </Typography>
-
+    <div className="max-w-lg">
+      <div className="card">
+        <div className="card-body">
           {error && (
-            <Alert severity="error" sx={{ mb: 2 }}>
+            <div className="alert alert-error">
               {error}
-            </Alert>
+            </div>
           )}
 
-          <Box sx={{ mb: 3 }}>
+          <div className="mb-md">
             <PuppeteerCrawlOption
               settings={puppeteerSettings}
               onSettingsChange={setPuppeteerSettings}
               disabled={status === 'running'}
             />
-          </Box>
+          </div>
 
-          <TextField
-            fullWidth
-            label="URL to Test"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://example.com"
-            disabled={status === 'running'}
-            sx={{ mb: 3 }}
-          />
+          <div className="form-group">
+            <label className="form-label" htmlFor="test-url">URL to Test</label>
+            <input
+              id="test-url"
+              type="url"
+              className="input"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://example.com"
+              disabled={status === 'running'}
+            />
+          </div>
 
-          <Button
-            variant="contained"
+          <button
+            className="btn btn-primary mb-md"
             onClick={handleStartTest}
             disabled={status === 'running'}
-            sx={{ mb: 2 }}
           >
-            {status === 'running' ? 'Testing...' : 'Start Test'}
-          </Button>
+            {status === 'running' ? (
+              <><span className="spinner spinner-sm spinner-inline" />Testing...</>
+            ) : '▶ Start Test'}
+          </button>
 
           {status === 'running' && (
-            <Box sx={{ width: '100%', mb: 2 }}>
-              <LinearProgress />
-            </Box>
+            <div className="progress mb-md">
+              <div className="progress-bar progress-bar-indeterminate" />
+            </div>
           )}
 
           {result && (
-            <Paper sx={{ p: 2, mt: 2 }}>
-              <Typography variant="h6" gutterBottom>
-                Test Results
-              </Typography>
+            <div className="card" style={{ marginTop: 'var(--spacing-lg)' }}>
+              <div className="card-header">
+                <h3 className="h4">Test Results</h3>
+              </div>
+              <div className="card-body">
+                {result.screenshot && (
+                  <div className="mb-md">
+                    <p className="text-sm text-muted mb-xs">Screenshot:</p>
+                    <img
+                      src={result.screenshot}
+                      alt="Page Screenshot"
+                      style={{ maxWidth: '100%', height: 'auto', borderRadius: 'var(--radius-md)' }}
+                    />
+                  </div>
+                )}
 
-              {result.screenshot && (
-                <Box sx={{ mb: 2 }}>
-                  <Typography variant="subtitle2" gutterBottom>Screenshot:</Typography>
-                  <img
-                    src={result.screenshot}
-                    alt="Page Screenshot"
-                    style={{ maxWidth: '100%', height: 'auto' }}
-                  />
-                </Box>
-              )}
-
-              <Typography variant="subtitle2" gutterBottom>Page Data:</Typography>
-              <pre style={{
-                overflow: 'auto',
-                padding: '1rem',
-                background: '#f5f5f5',
-                borderRadius: '4px'
-              }}>
-                {JSON.stringify(result.data, null, 2)}
-              </pre>
-            </Paper>
+                <p className="text-sm text-muted mb-xs">Page Data:</p>
+                <pre className="code-block">
+                  {JSON.stringify(result.data, null, 2)}
+                </pre>
+              </div>
+            </div>
           )}
-        </CardContent>
-      </Card>
-    </Box>
+        </div>
+      </div>
+    </div>
   );
 };
 

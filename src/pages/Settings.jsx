@@ -24,9 +24,7 @@ function Settings() {
   const [formData, setFormData] = useState({ name: '' });
 
   useEffect(() => {
-    return () => {
-      dispatch(clearTestStatus());
-    };
+    return () => { dispatch(clearTestStatus()); };
   }, [dispatch]);
 
   useEffect(() => {
@@ -67,21 +65,15 @@ function Settings() {
   const handleSaveCrawler = async (e) => {
     e.preventDefault();
     const crawlerData = { ...formData };
-    if (selectedCrawler) {
-      crawlerData.id = selectedCrawler.id;
-    }
+    if (selectedCrawler) crawlerData.id = selectedCrawler.id;
     const resultAction = await dispatch(saveCrawlerConfig(crawlerData));
-    if (!resultAction.error) {
-      handleCloseModal();
-    }
+    if (!resultAction.error) handleCloseModal();
   };
 
   const handleDeleteCrawler = async () => {
     if (!selectedCrawler) return;
     const resultAction = await dispatch(deleteCrawlerConfig(selectedCrawler.id));
-    if (!resultAction.error) {
-      setIsDeleteModalOpen(false);
-    }
+    if (!resultAction.error) setIsDeleteModalOpen(false);
   };
 
   const handleSetActive = (crawler) => {
@@ -89,122 +81,118 @@ function Settings() {
     toast.success(`${crawler.name} set as active configuration`);
   };
 
-  const inputStyles = `mt-1 block w-full rounded-md border-gray-300 shadow-sm
-    focus:border-blue-500 focus:ring-blue-500 sm:text-base py-2 px-3
-    bg-white text-gray-900 placeholder-gray-400
-    hover:border-blue-400 transition duration-150 ease-in-out`;
-
   if (status === 'loading' && crawlers.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center" style={{ minHeight: '50vh' }}>
         <LoadingSpinner size="lg" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 p-6">
-      {/* Active Configuration Display */}
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h2 className="text-lg font-medium mb-4">Active Crawler Configuration</h2>
-        {activeConfig ? (
-          <div className="space-y-2">
-            <div className="flex items-center">
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                Active
-              </span>
-              <h3 className="ml-2 text-lg font-medium">{activeConfig.name}</h3>
-            </div>
-            <p className="text-sm text-gray-500">Type: Puppeteer</p>
-          </div>
-        ) : (
-          <p className="text-gray-500">No active crawler configuration</p>
-        )}
-      </div>
-
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Crawler Settings</h1>
-          <p className="text-gray-500">Manage Puppeteer crawler configurations</p>
+    <div>
+      {/* Active configuration */}
+      <div className="card mb-lg">
+        <div className="card-header">
+          <h2 className="h3">Active Crawler Configuration</h2>
         </div>
-        <button
-          className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md flex items-center"
-          onClick={handleOpenAddModal}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-          </svg>
-          Add Configuration
-        </button>
+        <div className="card-body">
+          {activeConfig ? (
+            <div className="active-banner">
+              <span className="badge badge-success">Active</span>
+              <span className="font-medium">{activeConfig.name}</span>
+              <span className="text-muted text-sm">· Type: Puppeteer</span>
+            </div>
+          ) : (
+            <p className="text-muted">No active crawler configuration selected.</p>
+          )}
+        </div>
       </div>
 
-      {/* Crawler Configurations List */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-lg font-medium">Crawler Configurations</h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Manage your Puppeteer crawler configurations
-          </p>
+      {/* Header */}
+      <div className="page-header">
+        <div className="page-header-text">
+          <h1>Crawler Settings</h1>
+          <p>Manage Puppeteer crawler configurations</p>
+        </div>
+        <div className="page-header-actions">
+          <button className="btn btn-primary" onClick={handleOpenAddModal}>
+            + Add Configuration
+          </button>
+        </div>
+      </div>
+
+      {/* Configurations list */}
+      <div className="card">
+        <div className="card-header">
+          <div>
+            <h2 className="h3">Crawler Configurations</h2>
+            <p className="text-muted text-sm mt-xs">Manage your Puppeteer crawler configurations</p>
+          </div>
         </div>
 
         {status === 'loading' && (
-          <div className="p-4 text-center">
+          <div className="card-body text-center">
             <LoadingSpinner />
-            <p className="mt-2 text-gray-600">Loading configurations...</p>
+            <p className="text-muted mt-sm">Loading configurations...</p>
           </div>
         )}
 
         {status === 'succeeded' && crawlers.length === 0 && (
-          <div className="p-8 text-center">
-            <p className="mt-2 text-gray-500">No crawler configurations yet</p>
-            <button
-              className="mt-3 text-blue-600 hover:text-blue-800 font-medium"
-              onClick={handleOpenAddModal}
-            >
+          <div className="empty-state">
+            <div className="empty-state-icon">⚙️</div>
+            <h3>No crawler configurations yet</h3>
+            <button className="link-btn mt-sm" onClick={handleOpenAddModal}>
               Add your first crawler configuration
             </button>
           </div>
         )}
 
         {status === 'succeeded' && crawlers.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="table-wrapper">
+            <table className="table">
+              <thead>
                 <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th>Status</th>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th className="text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody>
                 {crawlers.map(crawler => (
                   <tr key={crawler.id}>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td>
                       {activeConfig?.id === crawler.id ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          Active
-                        </span>
+                        <span className="badge badge-success">Active</span>
                       ) : (
                         <button
+                          className="badge badge-default"
+                          style={{ cursor: 'pointer', border: 'none' }}
                           onClick={() => handleSetActive(crawler)}
-                          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 hover:bg-gray-200"
                         >
                           Set Active
                         </button>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{crawler.name}</div>
+                    <td className="font-medium">{crawler.name}</td>
+                    <td>
+                      <span className="badge badge-primary">Puppeteer</span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                        Puppeteer
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                      <button onClick={() => handleOpenEditModal(crawler)} className="text-blue-600 hover:text-blue-900">Edit</button>
-                      <button onClick={() => handleOpenDeleteModal(crawler)} className="text-red-600 hover:text-red-900">Delete</button>
+                    <td className="table-cell-actions">
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => handleOpenEditModal(crawler)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-ghost btn-sm text-error"
+                        onClick={() => handleOpenDeleteModal(crawler)}
+                        style={{ color: 'var(--color-error)' }}
+                      >
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -214,57 +202,53 @@ function Settings() {
         )}
       </div>
 
-      {/* Add/Edit Modal */}
+      {/* Add / Edit Modal */}
       <Modal
         isOpen={isAddModalOpen || isEditModalOpen}
         onClose={handleCloseModal}
         title={`${isAddModalOpen ? 'Add' : 'Edit'} Crawler Configuration`}
       >
-        <form onSubmit={handleSaveCrawler} className="space-y-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700" htmlFor="name">
-              Name
-            </label>
+        <form onSubmit={handleSaveCrawler}>
+          <div className="form-group">
+            <label className="form-label" htmlFor="name">Name</label>
             <input
               type="text"
               id="name"
               name="name"
               value={formData.name}
               onChange={handleInputChange}
-              className={inputStyles}
+              className="input"
               required
               placeholder="e.g. Default Puppeteer"
               disabled={status === 'loading'}
             />
           </div>
 
-          <div className="mt-6 flex justify-between items-center">
+          <div className="flex justify-between items-center mt-lg">
             <button
               type="button"
               onClick={handleTestConnection}
               disabled={testStatus === 'loading' || status === 'loading'}
-              className={`inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md
-                ${testStatus === 'loading' || status === 'loading' ? 'bg-gray-100 text-gray-500' : 'text-gray-700 bg-white hover:bg-gray-50'}
-                focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
+              className="btn btn-secondary"
             >
               {testStatus === 'loading' ? (
                 <><ButtonSpinner />Testing...</>
               ) : 'Test Puppeteer'}
             </button>
-            <div className="flex space-x-3">
+
+            <div className="flex gap-sm">
               <button
                 type="button"
                 onClick={handleCloseModal}
                 disabled={status === 'loading'}
-                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200"
+                className="btn btn-secondary"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={status === 'loading'}
-                className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white
-                  ${status === 'loading' ? 'bg-blue-400' : 'bg-blue-600 hover:bg-blue-700'}`}
+                className="btn btn-primary"
               >
                 {status === 'loading' ? <><ButtonSpinner />Saving...</> : 'Save'}
               </button>
@@ -279,24 +263,23 @@ function Settings() {
         onClose={() => setIsDeleteModalOpen(false)}
         title="Delete Crawler Configuration"
       >
-        <div className="mb-4">
-          <p className="text-gray-700">
-            Are you sure you want to delete "{selectedCrawler?.name}"?
-          </p>
-          <p className="text-sm text-gray-500 mt-2">This action cannot be undone.</p>
-        </div>
-        <div className="flex justify-end gap-2">
+        <p className="text-muted mb-xs">
+          Are you sure you want to delete <strong>"{selectedCrawler?.name}"</strong>?
+        </p>
+        <p className="text-sm text-muted mb-lg">This action cannot be undone.</p>
+
+        <div className="flex justify-end gap-sm">
           <button
             onClick={() => setIsDeleteModalOpen(false)}
             disabled={status === 'loading'}
-            className="py-2 px-4 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="btn btn-secondary"
           >
             Cancel
           </button>
           <button
             onClick={handleDeleteCrawler}
             disabled={status === 'loading'}
-            className="py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+            className="btn btn-danger"
           >
             {status === 'loading' ? <><ButtonSpinner />Deleting...</> : 'Delete'}
           </button>

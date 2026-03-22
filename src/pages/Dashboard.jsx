@@ -17,12 +17,10 @@ function Dashboard() {
   });
 
   useEffect(() => {
-    // Fetch required data for the dashboard
     dispatch(fetchVendors());
     dispatch(getActiveCrawls());
     dispatch(getCrawlHistory());
 
-    // Set up polling for active crawl jobs status
     const intervalId = setInterval(() => {
       dispatch(getActiveCrawls());
     }, 5000);
@@ -30,124 +28,114 @@ function Dashboard() {
     return () => clearInterval(intervalId);
   }, [dispatch]);
 
-  // Calculate statistics
   useEffect(() => {
     if (vendors.length > 0) {
-      // Calculate basic stats based on vendors and crawl data
       const completedJobs = history.filter(job => job.status === 'completed');
       setStats({
         totalVendors: vendors.length,
         crawledVendors: completedJobs.length > 0 ? Math.min(vendors.length, completedJobs.length) : 0,
         totalCrawls: history.length,
         completedCrawls: completedJobs.length,
-        // Mock data for now
         averageResponseTime: 245,
-        totalPages: completedJobs.length * 5 // Mock pages per vendor
+        totalPages: completedJobs.length * 5
       });
     }
   }, [vendors, history]);
 
+  const vendorPct = stats.totalVendors
+    ? Math.round((stats.crawledVendors / stats.totalVendors) * 100)
+    : 0;
+
+  const crawlPct = stats.totalCrawls
+    ? Math.round((stats.completedCrawls / stats.totalCrawls) * 100)
+    : 0;
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500">Overview of your crawling activities</p>
+    <div>
+      {/* Page header */}
+      <div className="page-header">
+        <div className="page-header-text">
+          <h1>Dashboard</h1>
+          <p>Overview of your crawling activities</p>
+        </div>
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-medium text-gray-500">Vendors</h3>
-          <div className="mt-2 flex items-baseline">
-            <div className="text-3xl font-semibold">{stats.crawledVendors}</div>
-            <div className="ml-2 text-sm text-gray-500">/ {stats.totalVendors} crawled</div>
-          </div>
-          <div className="mt-4 h-2 bg-gray-200 rounded-full">
-            <div 
-              className="h-full bg-blue-500 rounded-full" 
-              style={{ width: `${stats.totalVendors ? (stats.crawledVendors / stats.totalVendors) * 100 : 0}%` }}
-            ></div>
+      <div className="stats-grid">
+        <div className="stat-card">
+          <div className="stat-label">Vendors Crawled</div>
+          <div className="stat-value">{stats.crawledVendors}</div>
+          <div className="stat-secondary">of {stats.totalVendors} total</div>
+          <div className="progress mt-sm">
+            <div className="progress-bar" style={{ width: `${vendorPct}%` }} />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-medium text-gray-500">Crawl Jobs</h3>
-          <div className="mt-2 flex items-baseline">
-            <div className="text-3xl font-semibold">{stats.completedCrawls}</div>
-            <div className="ml-2 text-sm text-gray-500">/ {stats.totalCrawls} completed</div>
-          </div>
-          <div className="mt-4 h-2 bg-gray-200 rounded-full">
-            <div 
-              className="h-full bg-green-500 rounded-full" 
-              style={{ width: `${stats.totalCrawls ? (stats.completedCrawls / stats.totalCrawls) * 100 : 0}%` }}
-            ></div>
+        <div className="stat-card">
+          <div className="stat-label">Crawl Jobs</div>
+          <div className="stat-value">{stats.completedCrawls}</div>
+          <div className="stat-secondary">of {stats.totalCrawls} completed</div>
+          <div className="progress mt-sm">
+            <div className="progress-bar progress-bar-success" style={{ width: `${crawlPct}%` }} />
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-medium text-gray-500">Performance</h3>
-          <div className="mt-2">
-            <div className="text-3xl font-semibold">{stats.averageResponseTime} ms</div>
-            <div className="text-sm text-gray-500">Average response time</div>
-          </div>
-          <div className="mt-2">
-            <div className="text-xl font-medium">{stats.totalPages}</div>
-            <div className="text-sm text-gray-500">Total pages crawled</div>
-          </div>
+        <div className="stat-card">
+          <div className="stat-label">Avg. Response Time</div>
+          <div className="stat-value">{stats.averageResponseTime} <span style={{ fontSize: '1rem', fontWeight: 400 }}>ms</span></div>
+          <div className="stat-secondary">{stats.totalPages} total pages crawled</div>
         </div>
       </div>
 
       {/* Active crawl jobs */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h2 className="text-lg font-medium mb-4">Active Crawl Jobs</h2>
-        {!activeJob ? (
-          <p className="text-gray-500">No active crawl jobs</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Target URL
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Progress
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Started At
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                <tr key={activeJob.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{activeJob.targetUrl || 'Unknown URL'}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                      {activeJob.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
-                      <div 
-                        className="bg-blue-600 h-2.5 rounded-full" 
-                        style={{ width: `${activeJob.progress || 0}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-xs text-gray-500">{activeJob.progress || 0}% Complete</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {new Date(activeJob.startTime || Date.now()).toLocaleString()}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
+      <div className="card">
+        <div className="card-header">
+          <h2 className="h3">Active Crawl Jobs</h2>
+        </div>
+        <div className="card-body" style={{ padding: 0 }}>
+          {!activeJob ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">🔍</div>
+              <h3>No active crawl jobs</h3>
+              <p>Start a crawl from the Vendors page to see activity here.</p>
+            </div>
+          ) : (
+            <div className="table-wrapper">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Target URL</th>
+                    <th>Status</th>
+                    <th>Progress</th>
+                    <th>Started At</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="font-medium">{activeJob.targetUrl || 'Unknown URL'}</td>
+                    <td>
+                      <span className="badge badge-success">{activeJob.status}</span>
+                    </td>
+                    <td>
+                      <div className="flex flex-col gap-xs">
+                        <div className="progress">
+                          <div
+                            className="progress-bar"
+                            style={{ width: `${activeJob.progress || 0}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-muted">{activeJob.progress || 0}% Complete</span>
+                      </div>
+                    </td>
+                    <td className="text-muted">
+                      {new Date(activeJob.startTime || Date.now()).toLocaleString()}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

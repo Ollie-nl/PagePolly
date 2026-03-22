@@ -16,7 +16,6 @@ const CrawlerSettings = ({ vendorId, onSettingsSaved }) => {
   const {
     register,
     handleSubmit,
-    setValue,
     formState: { errors },
     reset
   } = useForm({
@@ -65,107 +64,101 @@ const CrawlerSettings = ({ vendorId, onSettingsSaved }) => {
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow">
-      <h2 className="text-2xl font-bold mb-6">Crawler Settings</h2>
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <div>
-          <div className="flex items-center mb-1">
-            <label className="block text-sm font-medium text-gray-700">Max Pages</label>
-            <Tooltip content="Maximum number of pages to crawl per session" />
+    <div className="card">
+      <div className="card-header">
+        <h2 className="h3">Crawler Settings</h2>
+      </div>
+      <div className="card-body">
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <div className="form-group">
+            <div className="flex items-center gap-xs mb-xs">
+              <label className="form-label" style={{ marginBottom: 0 }}>Max Pages</label>
+              <Tooltip content="Maximum number of pages to crawl per session" />
+            </div>
+            <input
+              type="number"
+              {...register('maxPages')}
+              className={`input${errors.maxPages ? ' error' : ''}`}
+              min={1}
+            />
+            {errors.maxPages && (
+              <p className="form-error">{errors.maxPages.message}</p>
+            )}
           </div>
-          <input
-            type="number"
-            {...register('maxPages')}
-            className={`mt-1 block w-full rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 ${
-              errors.maxPages ? 'border-red-300' : 'border-gray-300'
-            }`}
-            min={1}
-          />
-          {errors.maxPages && (
-            <p className="mt-1 text-sm text-red-600">{errors.maxPages.message}</p>
-          )}
-        </div>
 
-        <div>
-          <div className="flex items-center mb-1">
-            <label className="block text-sm font-medium text-gray-700">Crawl Delay (ms)</label>
-            <Tooltip content="Time to wait between requests in milliseconds" />
+          <div className="form-group">
+            <div className="flex items-center gap-xs mb-xs">
+              <label className="form-label" style={{ marginBottom: 0 }}>Crawl Delay (ms)</label>
+              <Tooltip content="Time to wait between requests in milliseconds" />
+            </div>
+            <input
+              type="number"
+              {...register('crawlDelay')}
+              className={`input${errors.crawlDelay ? ' error' : ''}`}
+              min={500}
+            />
+            {errors.crawlDelay && (
+              <p className="form-error">{errors.crawlDelay.message}</p>
+            )}
           </div>
-          <input
-            type="number"
-            {...register('crawlDelay')}
-            className={`mt-1 block w-full rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 ${
-              errors.crawlDelay ? 'border-red-300' : 'border-gray-300'
-            }`}
-            min={500}
-          />
-          {errors.crawlDelay && (
-            <p className="mt-1 text-sm text-red-600">{errors.crawlDelay.message}</p>
-          )}
-        </div>
 
-        <div>
-          <div className="flex items-center mb-1">
-            <label className="block text-sm font-medium text-gray-700">Start URLs</label>
-            <Tooltip content="Enter URLs to start crawling from (one per line)" />
+          <div className="form-group">
+            <div className="flex items-center gap-xs mb-xs">
+              <label className="form-label" style={{ marginBottom: 0 }}>Start URLs</label>
+              <Tooltip content="Enter URLs to start crawling from (one per line)" />
+            </div>
+            <textarea
+              {...register('startUrls')}
+              className={`textarea${errors.startUrls ? ' error' : ''}`}
+              rows={5}
+              placeholder={"https://example.com\nhttps://example.com/page"}
+            />
+            {errors.startUrls && (
+              <p className="form-error">{errors.startUrls.message}</p>
+            )}
           </div>
-          <textarea
-            {...register('startUrls')}
-            className={`mt-1 block w-full rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 ${
-              errors.startUrls ? 'border-red-300' : 'border-gray-300'
-            } min-h-[120px] p-3`}
-            rows={5}
-            placeholder="https://example.com&#10;https://example.com/page"
-          />
-          {errors.startUrls && (
-            <p className="mt-1 text-sm text-red-600">{errors.startUrls.message}</p>
-          )}
-        </div>
 
-        <div>
-          <div className="flex items-center mb-1">
-            <label className="block text-sm font-medium text-gray-700">Allowed Domains</label>
-            <Tooltip content="Domains to restrict crawling to (one per line)" />
+          <div className="form-group">
+            <div className="flex items-center gap-xs mb-xs">
+              <label className="form-label" style={{ marginBottom: 0 }}>Allowed Domains</label>
+              <Tooltip content="Domains to restrict crawling to (one per line)" />
+            </div>
+            <textarea
+              {...register('allowedDomains')}
+              className={`textarea${errors.allowedDomains ? ' error' : ''}`}
+              rows={5}
+              placeholder={"example.com\nsub.example.com"}
+            />
+            {errors.allowedDomains && (
+              <p className="form-error">{errors.allowedDomains.message}</p>
+            )}
           </div>
-          <textarea
-            {...register('allowedDomains')}
-            className={`mt-1 block w-full rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 ${
-              errors.allowedDomains ? 'border-red-300' : 'border-gray-300'
-            } min-h-[120px] p-3`}
-            rows={5}
-            placeholder="example.com&#10;sub.example.com"
-          />
-          {errors.allowedDomains && (
-            <p className="mt-1 text-sm text-red-600">{errors.allowedDomains.message}</p>
-          )}
-        </div>
 
-        <div>
-          <div className="flex items-center mb-1">
-            <label className="block text-sm font-medium text-gray-700">Exclude Patterns</label>
-            <Tooltip content="URL patterns to exclude from crawling (one per line)" />
+          <div className="form-group">
+            <div className="flex items-center gap-xs mb-xs">
+              <label className="form-label" style={{ marginBottom: 0 }}>Exclude Patterns</label>
+              <Tooltip content="URL patterns to exclude from crawling (one per line)" />
+            </div>
+            <textarea
+              {...register('excludePatterns')}
+              className={`textarea${errors.excludePatterns ? ' error' : ''}`}
+              rows={5}
+              placeholder={"/login\n/admin\n*.pdf"}
+            />
+            {errors.excludePatterns && (
+              <p className="form-error">{errors.excludePatterns.message}</p>
+            )}
           </div>
-          <textarea
-            {...register('excludePatterns')}
-            className={`mt-1 block w-full rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 ${
-              errors.excludePatterns ? 'border-red-300' : 'border-gray-300'
-            } min-h-[120px] p-3`}
-            rows={5}
-            placeholder="/login&#10;/admin&#10;*.pdf"
-          />
-          {errors.excludePatterns && (
-            <p className="mt-1 text-sm text-red-600">{errors.excludePatterns.message}</p>
-          )}
-        </div>
 
-        <button
-          type="submit"
-          disabled={isSaving || isLoading}
-          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-blue-300"
-        >
-          {isSaving ? 'Saving...' : 'Save Settings'}
-        </button>
-      </form>
+          <button
+            type="submit"
+            disabled={isSaving || isLoading}
+            className="btn btn-primary btn-full mt-md"
+          >
+            {isSaving ? 'Saving...' : 'Save Settings'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 };
