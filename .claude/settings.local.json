@@ -11,7 +11,11 @@
       "Bash(npm install:*)",
       "Bash(node -e \":*)",
       "Bash(git init:*)",
-      "Bash(git remote:*)"
+      "Bash(git remote:*)",
+      "Bash(ls /Users/r.olling/reposetories/pagepolly/src/*.css)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

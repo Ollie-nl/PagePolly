@@ -11,7 +11,6 @@ import NotFound from './pages/NotFound';
 import TestPage from './pages/TestPage';
 import TestCrawlerPage from './pages/TestCrawlerPage';
 import Login from './pages/auth/Login';
-import Register from './pages/auth/Register';
 import CrawlerPage from './pages/crawler/CrawlerPage';
 import { AuthProvider } from './hooks/useAuth';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -23,7 +22,6 @@ function App() {
           <AuthProvider>
             <Routes>
             <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
             <Route path="/" element={
               <ProtectedRoute>
                 <MainLayout />

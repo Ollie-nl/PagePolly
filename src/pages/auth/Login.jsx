@@ -1,6 +1,6 @@
 // src/pages/auth/Login.jsx
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 
 export default function Login() {
@@ -78,10 +78,6 @@ export default function Login() {
             {isLoading ? 'Signing in...' : 'Sign in'}
           </button>
 
-          <p className="text-center text-sm text-muted mt-lg">
-            Don't have an account?{' '}
-            <Link to="/register">Sign up</Link>
-          </p>
         </form>
       </div>
     </div>
