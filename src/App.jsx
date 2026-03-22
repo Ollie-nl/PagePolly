@@ -6,7 +6,6 @@ import MainLayout from './layouts/MainLayout';
 import Dashboard from './pages/Dashboard';
 import Vendors from './pages/Vendors';
 import Reports from './pages/Reports';
-import Settings from './pages/Settings';
 import NotFound from './pages/NotFound';
 import TestPage from './pages/TestPage';
 import TestCrawlerPage from './pages/TestCrawlerPage';
@@ -30,7 +29,6 @@ function App() {
               <Route index element={<Dashboard />} />
               <Route path="vendors" element={<Vendors />} />
               <Route path="reports" element={<Reports />} />
-              <Route path="settings" element={<Settings />} />
               <Route path="crawler/:projectId" element={<CrawlerPage />} />
               <Route path="test" element={<TestPage />} />
               <Route path="test-crawler" element={<TestCrawlerPage />} />

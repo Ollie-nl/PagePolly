@@ -6,7 +6,6 @@ const navItems = [
   { to: '/vendors',     label: 'Vendors',      icon: '🏪' },
   { to: '/reports',     label: 'Reports',      icon: '📊' },
   { to: '/test',        label: 'API Test',     icon: '🔬' },
-  { to: '/settings',    label: 'Settings',     icon: '⚙️' },
 ];
 
 function Sidebar() {

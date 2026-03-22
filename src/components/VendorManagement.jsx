@@ -12,7 +12,6 @@ const VendorManagement = () => {
   const [loading, setLoading] = useState(false);
 
   const dispatch = useDispatch();
-  const settings = useSelector(state => state.settings.activeConfig);
   const vendorItems = useSelector(state => state.vendors.items);
 
   useEffect(() => {
@@ -164,7 +163,6 @@ const VendorManagement = () => {
                   <div className="flex items-center gap-sm">
                     <CrawlButton
                       vendorId={vendor.id}
-                      settings={settings}
                       onCrawlComplete={(job) => {
                         if (job.status === 'completed') {
                           setSuccess(`Crawl completed for ${vendor.name}`);

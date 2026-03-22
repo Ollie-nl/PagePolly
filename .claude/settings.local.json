@@ -15,7 +15,9 @@
       "Bash(ls /Users/r.olling/reposetories/pagepolly/src/*.css)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git rm:*)",
+      "Bash(ls:*)"
     ]
   }
 }
