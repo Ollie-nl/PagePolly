@@ -9,7 +9,6 @@ const menuItems = [
   { text: 'Vendors',      icon: '🏪', path: '/vendors' },
   { text: 'Reports',      icon: '📊', path: '/reports' },
   { text: 'Test Crawler', icon: '🐛', path: '/test-crawler' },
-  { text: 'Settings',     icon: '⚙️', path: '/settings' },
 ];
 
 const MainLayout = () => {
