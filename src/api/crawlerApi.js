@@ -1,5 +1,6 @@
 import axios from 'axios';
 import axiosRetry from 'axios-retry';
+import supabaseClient from '../lib/supabaseClient';
 
 const crawlerClient = axios.create({
   baseURL: import.meta.env.VITE_CRAWLER_API_URL || '',
@@ -14,6 +15,17 @@ axiosRetry(crawlerClient, {
     axiosRetry.isNetworkOrIdempotentRequestError(error) ||
     error.response?.status === 503
 });
+
+crawlerClient.interceptors.request.use(
+  async (config) => {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (session?.access_token) {
+      config.headers['Authorization'] = `Bearer ${session.access_token}`;
+    }
+    return config;
+  },
+  error => Promise.reject(error)
+);
 
 crawlerClient.interceptors.response.use(
   response => response,

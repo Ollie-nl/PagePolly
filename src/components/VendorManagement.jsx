@@ -1,7 +1,7 @@
 // src/components/VendorManagement.jsx
 import React, { useState, useEffect } from 'react';
-import { useSelector } from 'react-redux';
-import { DatabaseService } from '../services/database';
+import { useSelector, useDispatch } from 'react-redux';
+import { fetchVendors, addVendor, deleteVendor } from '../store/reducers/vendorSlice';
 import CrawlButton from './CrawlButton';
 
 const VendorManagement = () => {
@@ -11,21 +11,17 @@ const VendorManagement = () => {
   const [success, setSuccess] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const dispatch = useDispatch();
   const settings = useSelector(state => state.settings.activeConfig);
+  const vendorItems = useSelector(state => state.vendors.items);
 
   useEffect(() => {
-    loadVendors();
-  }, []);
+    setVendors(vendorItems);
+  }, [vendorItems]);
 
-  const loadVendors = async () => {
-    try {
-      const vendorList = await DatabaseService.getVendors();
-      setVendors(vendorList);
-    } catch (err) {
-      setError('Failed to load vendors');
-      console.error('Error loading vendors:', err);
-    }
-  };
+  useEffect(() => {
+    dispatch(fetchVendors());
+  }, [dispatch]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -45,10 +41,9 @@ const VendorManagement = () => {
     }
 
     try {
-      await DatabaseService.createVendor(newVendor);
+      await dispatch(addVendor(newVendor)).unwrap();
       setSuccess('Vendor added successfully');
       setNewVendor({ name: '', url: '', description: '' });
-      await loadVendors();
     } catch (err) {
       setError('Failed to add vendor');
       console.error('Error adding vendor:', err);
@@ -61,8 +56,7 @@ const VendorManagement = () => {
     if (!window.confirm('Are you sure you want to delete this vendor?')) return;
 
     try {
-      await DatabaseService.deleteVendor(id);
-      await loadVendors();
+      await dispatch(deleteVendor(id)).unwrap();
       setSuccess('Vendor deleted successfully');
     } catch (err) {
       setError('Failed to delete vendor');
