@@ -31,11 +31,7 @@ const corsOptions = {
 // Middleware
 app.use(cors(corsOptions));
 
-// Import and initialize ScrapingBee proxy middleware before body parser
-import createScrapingBeeProxy from './middleware/scrapingBeeProxy.js';
-app.use('/api/scrapingbee', createScrapingBeeProxy());
-
-// Body parser middleware after proxy configuration
+// Body parser middleware
 app.use(bodyParser.json({ limit: '10mb' })); // Increased limit for screenshot data
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 

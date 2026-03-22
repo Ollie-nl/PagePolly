@@ -1,7 +1,10 @@
-// src/config/config.js
-export const SCRAPINGBEE_CONFIG = {
-  API_KEY: '5XJUYPT4XQM5G7RMKPYZNY6B9S8NJOPGMAFY86G1BWRS748Z2RQ0BNZA7JMOUPBH8S0DN1WE8O3IHLW4',
-  DEFAULT_PARAMS: {
-    render_js: false
+// Puppeteer crawler defaults
+export const PUPPETEER_CONFIG = {
+  DEFAULT_SETTINGS: {
+    simulateHumanBehavior: true,
+    takeScreenshots: true,
+    maxRetries: 3,
+    navigationTimeout: 30000,
+    waitForSelector: 'body'
   }
 };

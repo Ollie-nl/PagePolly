@@ -80,13 +80,7 @@ app.listen(PORT, () => {
   console.log(`PagePolly API server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
   
-  // Log ScrapingBee API configuration
-  if (!process.env.SCRAPING_BEE_API_KEY) {
-    console.warn('WARNING: SCRAPING_BEE_API_KEY environment variable not set');
-    console.warn('Crawling functionality will not work correctly');
-  } else {
-    console.log('ScrapingBee API configured successfully');
-  }
+  console.log('Puppeteer crawler ready');
 });
 
 module.exports = app;

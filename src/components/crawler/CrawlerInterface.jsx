@@ -1,6 +1,5 @@
 // CrawlerInterface.jsx
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -17,13 +16,10 @@ import {
   Chip,
   Divider,
   IconButton,
-  Grid,
   Paper,
   Accordion,
   AccordionSummary,
-  AccordionDetails,
-  FormControlLabel,
-  Switch
+  AccordionDetails
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -33,7 +29,7 @@ import {
   CancelOutlined as CancelIcon
 } from '@mui/icons-material';
 import { useDispatch, useSelector } from 'react-redux';
-import { 
+import {
   startCrawl,
   getCrawlHistory,
   getCrawlDetails,
@@ -46,25 +42,18 @@ const CrawlerInterface = ({ projectId }) => {
   const dispatch = useDispatch();
   const [urls, setUrls] = useState(['']);
   const [error, setError] = useState('');
-  const [usePuppeteer, setUsePuppeteer] = useState(false);
   const [puppeteerSettings, setPuppeteerSettings] = useState({
     simulateHumanBehavior: true,
-    useProxy: false,
     takeScreenshots: true,
     maxRetries: 3,
     waitTime: 2000,
   });
-  
+
   const crawlState = useSelector((state) => state.crawl);
   const { activeJob, history, selectedJob, loading } = crawlState;
-  
-  const settings = useSelector(state => state.settings);
-  const activeConfig = settings?.activeConfig;
-  const apiKey = activeConfig?.api_key?.trim() || '';
 
   useEffect(() => {
     dispatch(getCrawlHistory({ projectId }));
-    
     return () => {
       dispatch(clearCrawlState());
     };
@@ -72,13 +61,11 @@ const CrawlerInterface = ({ projectId }) => {
 
   useEffect(() => {
     let interval;
-    
-    if (activeJob && activeJob.id && (activeJob.status === 'pending' || activeJob.status === 'running')) {
+    if (activeJob?.id && ['pending', 'running'].includes(activeJob.status)) {
       interval = setInterval(() => {
         dispatch(getCrawlDetails(activeJob.id));
       }, 5000);
     }
-    
     return () => {
       if (interval) clearInterval(interval);
     };
@@ -90,9 +77,7 @@ const CrawlerInterface = ({ projectId }) => {
     setUrls(newUrls);
   };
 
-  const addUrlField = () => {
-    setUrls([...urls, '']);
-  };
+  const addUrlField = () => setUrls([...urls, '']);
 
   const removeUrlField = (index) => {
     const newUrls = [...urls];
@@ -102,33 +87,21 @@ const CrawlerInterface = ({ projectId }) => {
 
   const handleStartCrawl = () => {
     const validUrls = urls.filter(url => url.trim() !== '');
-    
     if (validUrls.length === 0) {
       setError('Please enter at least one valid URL');
       return;
     }
-    
-    if (!apiKey && !usePuppeteer) {
-      setError('Missing API key. Please configure API settings first.');
-      return;
-    }
-    
     setError('');
-    
-    const payload = {
+    dispatch(startCrawl({
       projectId,
       urls: validUrls,
-      crawlerType: usePuppeteer ? 'puppeteer' : 'api',
-      settings: usePuppeteer ? puppeteerSettings : { api_key: apiKey }
-    };
-    
-    dispatch(startCrawl(payload));
+      crawlerType: 'puppeteer',
+      settings: puppeteerSettings
+    }));
   };
 
   const handleCancelCrawl = () => {
-    if (activeJob) {
-      dispatch(cancelCrawl(activeJob.id));
-    }
+    if (activeJob) dispatch(cancelCrawl(activeJob.id));
   };
 
   const handleViewJobDetails = (jobId) => {
@@ -137,10 +110,6 @@ const CrawlerInterface = ({ projectId }) => {
 
   const handleRefreshHistory = () => {
     dispatch(getCrawlHistory({ projectId }));
-  };
-
-  const handlePuppeteerSettingsChange = (newSettings) => {
-    setPuppeteerSettings(newSettings);
   };
 
   const renderStatusChip = (status) => {
@@ -161,32 +130,19 @@ const CrawlerInterface = ({ projectId }) => {
           <Typography variant="h6" gutterBottom>
             Start New Crawl
           </Typography>
-          
+
           {error && (
             <Alert severity="error" sx={{ mb: 2 }}>
               {error}
             </Alert>
           )}
-          
-          <Stack spacing={2}>
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={usePuppeteer}
-                  onChange={(e) => setUsePuppeteer(e.target.checked)}
-                  disabled={loading}
-                />
-              }
-              label="Use Puppeteer Crawler"
-            />
 
-            {usePuppeteer && (
-              <PuppeteerCrawlOption
-                settings={puppeteerSettings}
-                onSettingsChange={handlePuppeteerSettingsChange}
-                disabled={loading}
-              />
-            )}
+          <Stack spacing={2}>
+            <PuppeteerCrawlOption
+              settings={puppeteerSettings}
+              onSettingsChange={setPuppeteerSettings}
+              disabled={loading}
+            />
 
             {urls.map((url, index) => (
               <Box key={index} sx={{ display: 'flex', alignItems: 'center' }}>
@@ -200,8 +156,8 @@ const CrawlerInterface = ({ projectId }) => {
                   variant="outlined"
                   size="small"
                 />
-                <IconButton 
-                  onClick={() => removeUrlField(index)} 
+                <IconButton
+                  onClick={() => removeUrlField(index)}
                   disabled={urls.length === 1 || loading}
                   sx={{ ml: 1 }}
                 >
@@ -209,10 +165,10 @@ const CrawlerInterface = ({ projectId }) => {
                 </IconButton>
               </Box>
             ))}
-            
+
             <Box>
-              <Button 
-                startIcon={<AddIcon />} 
+              <Button
+                startIcon={<AddIcon />}
                 onClick={addUrlField}
                 disabled={loading}
                 size="small"
@@ -220,12 +176,12 @@ const CrawlerInterface = ({ projectId }) => {
                 Add URL
               </Button>
             </Box>
-            
+
             <Box>
-              <Button 
-                variant="contained" 
+              <Button
+                variant="contained"
                 onClick={handleStartCrawl}
-                disabled={loading || (activeJob && (activeJob.status === 'pending' || activeJob.status === 'running'))}
+                disabled={loading || (activeJob && ['pending', 'running'].includes(activeJob.status))}
               >
                 Start Crawling
               </Button>
@@ -234,10 +190,67 @@ const CrawlerInterface = ({ projectId }) => {
         </CardContent>
       </Card>
 
-      {/* Rest of the component remains the same */}
-      {/* ... Active Job Card ... */}
-      {/* ... Selected Job Card ... */}
-      {/* ... History Card ... */}
+      {activeJob && (
+        <Card sx={{ mb: 4 }}>
+          <CardContent>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6">Active Job</Typography>
+              {renderStatusChip(activeJob.status)}
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={activeJob.progress || 0}
+              sx={{ mb: 1 }}
+            />
+            <Typography variant="body2" color="text.secondary">
+              {activeJob.progress || 0}% complete
+            </Typography>
+            {['pending', 'running'].includes(activeJob.status) && (
+              <Button
+                startIcon={<CancelIcon />}
+                onClick={handleCancelCrawl}
+                color="error"
+                size="small"
+                sx={{ mt: 2 }}
+              >
+                Cancel
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {history && history.length > 0 && (
+        <Card>
+          <CardContent>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6">Crawl History</Typography>
+              <Button startIcon={<RefreshIcon />} onClick={handleRefreshHistory} size="small">
+                Refresh
+              </Button>
+            </Box>
+            <List>
+              {history.map((job, index) => (
+                <React.Fragment key={job.id}>
+                  {index > 0 && <Divider />}
+                  <ListItem
+                    secondaryAction={
+                      <Button size="small" onClick={() => handleViewJobDetails(job.id)}>
+                        Details
+                      </Button>
+                    }
+                  >
+                    <ListItemText
+                      primary={<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>{renderStatusChip(job.status)}</Box>}
+                      secondary={new Date(job.startTime).toLocaleString()}
+                    />
+                  </ListItem>
+                </React.Fragment>
+              ))}
+            </List>
+          </CardContent>
+        </Card>
+      )}
     </Box>
   );
 };

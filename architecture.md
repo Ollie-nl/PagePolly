@@ -1,91 +1,170 @@
-# PagePolly Architecture
+# PagePolly — Architectuur
 
-## Overview
-PagePolly is a web crawling application that supports multiple crawling methods to monitor vendor websites. The system is built with a modern tech stack including React for the frontend and Node.js for the backend, with Supabase providing database and authentication services.
+## Overzicht
 
-## Crawling Methods
+PagePolly is een web monitoring tool bestaande uit drie lagen:
 
-### 1. API-based Crawling
-- Direct API integration with vendor systems
-- Structured data retrieval
-- Rate limiting compliance
+```
+┌─────────────────────────────────────┐
+│  Browser (React SPA)                │  port 5175 (dev)
+│  React · Redux · MUI                │
+└───────────────┬─────────────────────┘
+                │ HTTP / REST
+┌───────────────▼─────────────────────┐
+│  Backend (Node.js / Express)        │  port 4000
+│  Puppeteer crawl engine             │
+└───────────────┬─────────────────────┘
+                │ Supabase JS client
+┌───────────────▼─────────────────────┐
+│  Supabase (PostgreSQL + Auth)       │
+│  Row Level Security                 │
+└─────────────────────────────────────┘
+```
 
-### 2. Puppeteer-based Crawling
-- Headless browser automation
-- Anti-blocking mechanisms:
-  - User agent rotation
-  - Request delays and timing randomization
-  - Browser fingerprint protection
-  - Proxy support (configurable)
-- Human behavior simulation:
-  - Random scroll patterns
-  - Natural mouse movements
-  - Varying interaction delays
+---
 
-## System Components
+## Frontend
 
-### Frontend (React)
-- User Interface Components
-  - Vendor Management
-  - Crawl Configuration
-  - Results Dashboard
-  - Test Interface
-- State Management (Redux)
-- API Client Services
+**Stack:** React 18 · Redux Toolkit · MUI 7
 
-### Backend (Node.js)
-- API Routes
-- Crawling Services
-  - PuppeteerManager
-  - APIClient
-  - ResultProcessor
-- Database Operations
-- Authentication
+### Pagina's
 
-### Database (Supabase)
-- Vendors
-- CrawlJobs
-- CrawlResults
-- UserConfigs
+| Route | Pagina | Beschrijving |
+|-------|--------|-------------|
+| `/` | Dashboard | Overzicht actieve jobs en statistieken |
+| `/vendors` | Vendors | Beheer vendor-configuraties |
+| `/crawler/:id` | Crawler | Start en monitor crawls per vendor |
+| `/reports` | Reports | Resultaten en rapporten |
+| `/settings` | Settings | Puppeteer-configuraties beheren |
+| `/test` | Test | Test een enkele URL direct |
 
-## Data Flow
+### State management (Redux slices)
 
-1. **Configuration**
-   - User configures vendor settings
-   - System stores configuration in Supabase
+| Slice | Bestand | Verantwoordelijkheid |
+|-------|---------|---------------------|
+| `crawl` | `crawlSlice.js` | Crawl jobs (starten, status, annuleren) |
+| `vendors` | `vendorSlice.js` | CRUD vendor-configuraties |
+| `reports` | `reportSlice.js` | Rapporten ophalen |
+| `settings` | `settingSlice.js` | Puppeteer-configs beheren |
 
-2. **Crawl Initiation**
-   - User triggers crawl through UI
-   - System selects appropriate crawler (API/Puppeteer)
-   - Job queued in database
+### API communicatie
 
-3. **Crawl Execution**
-   - Crawler service processes job
-   - Anti-blocking measures applied
-   - Data extracted and validated
+- `src/api/crawlerApi.js` — Axios client met retry-logica voor crawl-endpoints
+- `src/api/apiClient.js` — Axios client voor vendor- en report-endpoints
+- Auth token wordt automatisch via Supabase opgehaald
 
-4. **Results Processing**
-   - Raw data cleaned and normalized
-   - Results stored in database
-   - Notifications sent if configured
+---
 
-## Security Measures
+## Backend
 
-- Row Level Security (RLS) in Supabase
-- JWT-based authentication
-- Rate limiting
-- Data encryption at rest
+**Entry point:** `server/index.js` (gestart via `start-crawler.js`)
 
-## Performance Considerations
+### Express routes
 
-- Connection pooling
-- Result caching
-- Batch processing
-- Automatic retries with exponential backoff
+| Prefix | Bestand | Beschrijving |
+|--------|---------|-------------|
+| `/api/crawls` | `routes/crawlRoutes.js` | Crawl jobs beheren |
+| `/api/vendors` | `routes/vendorRoutes.js` | Vendor CRUD |
+| `/api/reports` | `routes/reportRoutes.js` | Rapport queries |
+| `/api/health` | (inline) | Server health check |
 
-## Monitoring and Logging
+Alle routes (behalve `/api/health`) zijn beveiligd met een JWT middleware die tokens valideert via Supabase.
 
-- Crawl success rates
-- Error tracking
-- Performance metrics
-- Resource utilization
+### Crawl flow
+
+```
+POST /api/crawls
+  └── crawlRoutes.js
+        └── crawlService.js
+              └── puppeteer.launch()
+                    ├── puppeteer-extra-plugin-stealth   (anti-detectie)
+                    ├── puppeteer-extra-plugin-adblocker (tracker blokkering)
+                    └── page.goto(url)
+                          ├── extractPageData()   → titels, headings, links
+                          └── page.screenshot()   → base64 JPEG
+              └── db.storeCrawlResult()
+```
+
+### Puppeteer configuratie
+
+- Stealth mode aan: voorkomt detectie als headless browser
+- Adblocker aan: blokkeert trackers (snellere laadtijden)
+- Resources geblokkeerd: images, fonts, stylesheets (snellere crawl)
+- User agent: actuele Chrome UA
+- Retry logica: max 3 pogingen per URL, exponential backoff
+
+---
+
+## Database (Supabase / PostgreSQL)
+
+Schema bestand: `supabase/schema.sql`
+
+### Tabellen
+
+```
+auth.users (Supabase intern)
+    │
+    ├── vendors
+    │     ├── crawl_jobs
+    │     │     ├── crawl_results
+    │     │     └── crawl_errors
+    │     └── (vendor_id op crawl_results)
+    │
+    └── crawler_configs
+```
+
+### Tabel details
+
+**vendors**
+```sql
+id, user_id, name, url, status, created_at, updated_at
+```
+
+**crawl_jobs**
+```sql
+id, user_id, user_email, vendor_id, urls (jsonb),
+status, progress, settings (jsonb), error, created_at, completed_at
+```
+
+**crawl_results**
+```sql
+id, job_id, vendor_id, url, status, data (jsonb),
+screenshot, crawl_duration, retry_count, created_at
+```
+
+**crawl_errors**
+```sql
+id, job_id, url, error, is_blocking, created_at
+```
+
+**crawler_configs**
+```sql
+id, user_id, user_email, name, type, options (jsonb), created_at, updated_at
+```
+
+### Row Level Security
+
+Elke tabel heeft RLS-policies zodat gebruikers alleen hun eigen data kunnen zien en bewerken. De backend gebruikt de service role key om schrijfoperaties buiten RLS te kunnen uitvoeren.
+
+---
+
+## Authenticatie
+
+- Supabase Auth (email/wachtwoord)
+- JWT tokens worden door de frontend opgeslagen via Supabase JS client
+- Backend valideert tokens bij elk verzoek via `supabase.auth.getUser(token)`
+- Frontend stuurt token mee als `Authorization: Bearer <token>` header
+
+---
+
+## Development setup
+
+```
+.env                 ← lokale credentials (niet in git)
+.env.template        ← template met uitleg
+
+pnpm dev             ← frontend op :5175
+node start-crawler.js ← backend op :4000
+
+vite proxy: /api → http://localhost:4000
+```

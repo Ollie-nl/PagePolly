@@ -184,7 +184,7 @@ router.get('/', async (req, res, next) => {
  */
 router.post('/test', async (req, res, next) => {
   try {
-    const { url, method, settings, user_email } = req.body;
+    const { url, settings, user_email } = req.body;
 
     // Validate URL
     try {
@@ -197,19 +197,9 @@ router.post('/test', async (req, res, next) => {
       });
     }
 
-    // Validate method
-    if (!['puppeteer', 'api'].includes(method)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid method',
-        message: 'Method must be either "puppeteer" or "api"'
-      });
-    }
-
     // Start test crawl
     const result = await crawlService.testCrawl({
       url,
-      method,
       settings,
       user_email
     });

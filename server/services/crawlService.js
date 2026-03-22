@@ -353,35 +353,8 @@ class CrawlService {
    * @param {string} params.user_email - User's email
    * @returns {Promise<Object>} - Test results
    */
-  async testCrawl({ url, method, settings, user_email }) {
+  async testCrawl({ url, settings, user_email }) {
     try {
-      // For API method, use ScrapingBee
-      if (method === 'api') {
-        const response = await fetch('http://localhost:5000/api/scrapingbee/scrape', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ url, ...settings }),
-        });
-
-        if (!response.ok) {
-          throw new Error(`ScrapingBee API error: ${response.status}`);
-        }
-
-        const data = await response.json();
-        return {
-          data: {
-            url,
-            title: data.title || '',
-            content: data.pageSource || '',
-            timestamp: new Date().toISOString(),
-          },
-          crawlDuration: data.crawlDuration || 0,
-        };
-      }
-
-      // For Puppeteer method
       const browser = await puppeteer.launch({
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
         headless: 'new'

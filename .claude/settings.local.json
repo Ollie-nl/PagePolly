@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git clone:*)",
+      "Bash(cp -r tmp_clone/. .)",
+      "Bash(rm -rf tmp_clone)",
+      "WebFetch(domain:registry.npmjs.org)",
+      "Bash(node:*)",
+      "Bash(pnpm install:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e \":*)",
+      "Bash(git init:*)",
+      "Bash(git remote:*)"
+    ]
+  }
+}

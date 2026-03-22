@@ -2,7 +2,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { toast } from 'react-hot-toast';
 import supabaseClient from '../../lib/supabaseClient';
-import scrapingBeeService from '../../services/scrapingBeeService';
+import axios from 'axios';
 
 // Async thunks
 export const fetchCrawlerConfigs = createAsyncThunk(
@@ -15,7 +15,7 @@ export const fetchCrawlerConfigs = createAsyncThunk(
       }
 
       const { data, error } = await supabaseClient
-        .from('crawler_x65isd_configs')
+        .from('crawler_configs')
         .select('*')
         .eq('user_email', session.user.email);
 
@@ -39,9 +39,7 @@ export const saveCrawlerConfig = createAsyncThunk(
 
       const configData = {
         name: config.name,
-        type: config.type,
-        api_key: config.apiKey,
-        api_endpoint: config.apiEndpoint,
+        type: 'puppeteer',
         user_email: session.user.email,
         options: config.options || {}
       };
@@ -49,7 +47,7 @@ export const saveCrawlerConfig = createAsyncThunk(
       let result;
       if (config.id) {
         const { data, error } = await supabaseClient
-          .from('crawler_x65isd_configs')
+          .from('crawler_configs')
           .update(configData)
           .eq('id', config.id)
           .select()
@@ -59,7 +57,7 @@ export const saveCrawlerConfig = createAsyncThunk(
         result = data;
       } else {
         const { data, error } = await supabaseClient
-          .from('crawler_x65isd_configs')
+          .from('crawler_configs')
           .insert(configData)
           .select()
           .single();
@@ -81,7 +79,7 @@ export const deleteCrawlerConfig = createAsyncThunk(
   async (id, { rejectWithValue }) => {
     try {
       const { error } = await supabaseClient
-        .from('crawler_x65isd_configs')
+        .from('crawler_configs')
         .delete()
         .eq('id', id);
 
@@ -96,30 +94,15 @@ export const deleteCrawlerConfig = createAsyncThunk(
 
 export const testCrawlerConfig = createAsyncThunk(
   'settings/testCrawlerConfig',
-  async (config, { rejectWithValue, signal }) => {
+  async (_, { rejectWithValue }) => {
     try {
-      // Ensure API key is present and clean it
-      if (!config.apiKey) {
-        throw new Error('API key is required for testing');
+      const response = await axios.get('/api/health');
+      if (!response.data?.success) {
+        throw new Error(response.data?.message || 'Health check failed');
       }
-      
-      // Clean the API key by removing whitespace
-      const cleanApiKey = config.apiKey.trim();
-      
-      if (!cleanApiKey) {
-        throw new Error('API key cannot be empty');
-      }
-      
-      console.log('Testing API connection with key (masked):', '****' + cleanApiKey.substring(cleanApiKey.length - 4));
-      
-      const result = await scrapingBeeService.testConnection(cleanApiKey);
-      if (!result.success) {
-        throw new Error(result.message);
-      }
-      return result;
+      return { success: true, message: 'Puppeteer service is healthy' };
     } catch (error) {
-      console.error('Error testing crawler config:', error);
-      return rejectWithValue(error.message);
+      return rejectWithValue(error.response?.data?.message || error.message);
     }
   }
 );
@@ -136,13 +119,6 @@ const settingsSlice = createSlice({
   },
   reducers: {
     setActiveConfig: (state, action) => {
-      console.log('Setting active config in reducer:', action.payload);
-      // Ensure API key is properly set
-      if (action.payload && action.payload.api_key) {
-        console.log('Active config has API key (masked):', '****' + action.payload.api_key.substring(action.payload.api_key.length - 4));
-      } else {
-        console.warn('Active config is missing API key:', action.payload);
-      }
       state.activeConfig = action.payload;
     },
     clearTestStatus: (state) => {
