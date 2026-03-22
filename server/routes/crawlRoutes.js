@@ -9,36 +9,25 @@ const crawlService = require('../services/crawlService');
  */
 router.post('/', async (req, res, next) => {
   try {
-    const { projectId, urls } = req.body;
-    const userId = req.user.id; // From auth middleware
-    
-    if (!projectId || !urls || !Array.isArray(urls) || urls.length === 0) {
-      return res.status(400).json({
-        error: 'Invalid request',
-        message: 'Project ID and an array of URLs are required'
-      });
+    const { vendorId, settings } = req.body;
+    const userId = req.user.id;
+
+    if (!vendorId) {
+      return res.status(400).json({ error: 'Invalid request', message: 'vendorId is required' });
     }
 
-    // Validate URLs
-    const validUrls = urls.filter(url => {
-      try {
-        new URL(url);
-        return true;
-      } catch (e) {
-        return false;
-      }
-    });
-
-    if (validUrls.length === 0) {
-      return res.status(400).json({
-        error: 'Invalid URLs',
-        message: 'No valid URLs provided'
-      });
+    // Look up vendor to get the URL
+    const db = require('../config/db');
+    const vendor = await db.getVendor(vendorId);
+    if (!vendor) {
+      return res.status(404).json({ error: 'Not found', message: 'Vendor not found' });
+    }
+    if (!vendor.url) {
+      return res.status(400).json({ error: 'Invalid vendor', message: 'Vendor has no URL configured' });
     }
 
-    // Start crawl
-    const job = await crawlService.startCrawl(projectId, userId, validUrls);
-    
+    const job = await crawlService.startCrawl(vendorId, userId, [vendor.url], settings);
+
     res.status(201).json({
       message: 'Crawl job started successfully',
       id: job.id,

@@ -133,6 +133,17 @@ const db = {
 
   // ── Vendors ─────────────────────────────────────────────────
 
+  async getVendor(vendorId) {
+    const { data, error } = await supabase
+      .from('vendors')
+      .select('*')
+      .eq('id', vendorId)
+      .single();
+
+    if (error) throw new Error(`Failed to get vendor: ${error.message}`);
+    return data;
+  },
+
   async getVendors(userId) {
     const { data, error } = await supabase
       .from('vendors')

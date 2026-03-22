@@ -19,14 +19,14 @@ class CrawlService {
    * @param {Array<string>} urls - URLs to crawl
    * @returns {Object} - The job details
    */
-  async startCrawl(projectId, userId, urls) {
-    // Create a new job
+  async startCrawl(vendorId, userId, urls, settings = {}) {
     const jobId = uuidv4();
     const job = {
       id: jobId,
-      projectId,
+      vendorId,
       userId,
       urls,
+      settings,
       status: 'pending',
       progress: 0,
       startTime: new Date(),
@@ -34,10 +34,7 @@ class CrawlService {
       errors: []
     };
 
-    // Store in active jobs
     this.activeJobs.set(jobId, job);
-
-    // Record job in database
     await db.createCrawlJob(job);
 
     // Start crawling process in background
