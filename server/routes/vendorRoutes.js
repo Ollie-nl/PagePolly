@@ -6,8 +6,31 @@ const db = require('../config/db');
 // GET /api/vendors
 router.get('/', async (req, res) => {
   try {
+    const { createClient } = require('@supabase/supabase-js');
+    const supabase = createClient(
+      process.env.VITE_SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+
     const vendors = await db.getVendors(req.user.id);
-    res.json(vendors);
+
+    // Fetch last crawl date per vendor in one query
+    const vendorIds = vendors.map(v => v.id);
+    let lastCrawled = {};
+    if (vendorIds.length > 0) {
+      const { data } = await supabase
+        .from('crawl_jobs')
+        .select('vendor_id, created_at')
+        .in('vendor_id', vendorIds)
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false });
+
+      (data || []).forEach(row => {
+        if (!lastCrawled[row.vendor_id]) lastCrawled[row.vendor_id] = row.created_at;
+      });
+    }
+
+    res.json(vendors.map(v => ({ ...v, lastCrawled: lastCrawled[v.id] || null })));
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

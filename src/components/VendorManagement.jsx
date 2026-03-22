@@ -158,6 +158,12 @@ const VendorManagement = () => {
                     {vendor.description && (
                       <p className="text-muted text-sm mt-xs">{vendor.description}</p>
                     )}
+                    <p className="text-xs text-muted mt-xs">
+                      {vendor.lastCrawled
+                        ? <>Last crawled: <strong>{new Date(vendor.lastCrawled).toLocaleString()}</strong></>
+                        : <span style={{ color: 'var(--color-warning)' }}>Not crawled yet</span>
+                      }
+                    </p>
                   </div>
 
                   <div className="flex items-center gap-sm">

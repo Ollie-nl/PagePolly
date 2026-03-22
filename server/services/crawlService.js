@@ -61,24 +61,29 @@ class CrawlService {
       // Update status to running
       this.updateJobStatus(jobId, 'running');
 
-      // Launch browser
       const browser = await puppeteer.launch({
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        headless: 'new' // Use new headless mode
+        headless: 'new'
       });
 
-      // Process each URL
-      const results = [];
-      for (let i = 0; i < job.urls.length; i++) {
-        if (job.status === 'cancelled') break;
+      const maxPages  = Math.min(job.settings?.maxPages || 10, 100);
+      const rootUrl   = job.urls[0];
+      const rootHost  = new URL(rootUrl).hostname;
 
-        const url = job.urls[i];
+      const visited = new Set();
+      const queue   = [rootUrl];
+      const results = [];
+
+      while (queue.length > 0 && results.length < maxPages && job.status !== 'cancelled') {
+        const url = queue.shift();
+        if (visited.has(url)) continue;
+        visited.add(url);
+
         const startTime = Date.now();
         try {
-          const result = await this.crawlSinglePage(browser, url);
+          const result      = await this.crawlSinglePage(browser, url);
           const crawlDuration = Date.now() - startTime;
 
-          // Store individual result in database
           await db.storeCrawlResult({
             jobId,
             vendorId: job.vendorId,
@@ -90,15 +95,26 @@ class CrawlService {
           });
 
           results.push({ url, ...result });
-          const progress = Math.floor(((i + 1) / job.urls.length) * 100);
+
+          // Enqueue internal links not yet visited
+          for (const link of (result.data.links || [])) {
+            try {
+              if (new URL(link.href).hostname === rootHost && !visited.has(link.href)) {
+                queue.push(link.href);
+              }
+            } catch { /* skip malformed URLs */ }
+          }
+
+          const progress = Math.min(Math.floor((results.length / maxPages) * 100), 99);
           this.updateJobProgress(jobId, progress);
+
+          console.log(`[${jobId}] Crawled ${results.length}/${maxPages}: ${url}`);
         } catch (error) {
           job.errors.push({ url, error: error.message });
           await db.recordCrawlError(jobId, url, error.message);
         }
       }
 
-      // Close browser
       await browser.close();
 
       if (job.status !== 'cancelled') {

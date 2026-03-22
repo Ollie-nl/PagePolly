@@ -17,7 +17,7 @@ const CrawlButton = ({ vendorId, onCrawlComplete }) => {
   const [error, setError] = useState(null);
   const [jobStatus, setJobStatus] = useState(null); // { status, progress }
   const [puppeteerSettings, setPuppeteerSettings] = useState({
-    simulateHumanBehavior: true,
+    maxPages: 10,
     maxRetries: 3,
     waitTime: 2000,
   });
@@ -123,16 +123,35 @@ const CrawlButton = ({ vendorId, onCrawlComplete }) => {
               {error && <div className="alert alert-error mb-md">{error}</div>}
 
               {phase === 'config' && (
-                <PuppeteerCrawlOption
-                  settings={puppeteerSettings}
-                  onSettingsChange={setPuppeteerSettings}
-                />
+                <div>
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="maxPages">
+                      Max pages to crawl
+                      <span className="text-muted text-sm" style={{ marginLeft: '0.5rem' }}>(follows internal links)</span>
+                    </label>
+                    <input
+                      id="maxPages"
+                      type="number"
+                      min="1"
+                      max="100"
+                      className="input"
+                      value={puppeteerSettings.maxPages}
+                      onChange={(e) => setPuppeteerSettings(s => ({ ...s, maxPages: parseInt(e.target.value) || 1 }))}
+                    />
+                    <p className="text-xs text-muted mt-xs">
+                      The crawler starts at the vendor URL and follows links on the same domain until the limit is reached.
+                    </p>
+                  </div>
+                </div>
               )}
 
               {(phase === 'running' || phase === 'done') && (
                 <div>
                   <p className="text-sm text-muted mb-sm">
                     {STATUS_LABELS[status] || status}
+                    {status === 'running' && progress > 0 && (
+                      <span> — page {Math.round(progress / 100 * puppeteerSettings.maxPages)}/{puppeteerSettings.maxPages}</span>
+                    )}
                   </p>
 
                   <div className="progress">
