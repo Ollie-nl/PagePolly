@@ -365,16 +365,6 @@ class CrawlService {
         const result = await this.crawlSinglePage(browser, url);
         const crawlDuration = Date.now() - startTime;
 
-        // Record successful test in database
-        await db.recordTestCrawl({
-          url,
-          method,
-          user_email,
-          success: true,
-          duration: crawlDuration,
-          timestamp: new Date()
-        });
-
         return {
           ...result,
           crawlDuration
@@ -383,16 +373,6 @@ class CrawlService {
         await browser.close();
       }
     } catch (error) {
-      // Record failed test in database
-      await db.recordTestCrawl({
-        url,
-        method,
-        user_email,
-        success: false,
-        error: error.message,
-        timestamp: new Date()
-      });
-
       // Enhance error with additional information
       const enhancedError = new Error(error.message);
       enhancedError.code = error.code || 'CRAWL_ERROR';

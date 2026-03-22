@@ -25,7 +25,8 @@ const CrawlButton = ({ vendorId, onCrawlComplete }) => {
     setError(null);
 
     try {
-      const { data: { user, session } } = await supabaseClient.auth.getUser();
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      const { data: { session } } = await supabaseClient.auth.getSession();
 
       const response = await fetch('/api/crawls', {
         method: 'POST',

@@ -18,7 +18,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 function App() {
   return (
     <Provider store={store}>
-        <Router>
+        <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <AuthProvider>
             <Routes>
             <Route path="/login" element={<Login />} />
