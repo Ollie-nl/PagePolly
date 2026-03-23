@@ -1,12 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchVendors } from '../store/reducers/vendorSlice';
-import { getActiveCrawls, getCrawlHistory } from '../store/reducers/crawlSlice';
+import { getActiveCrawls, getCrawlHistory, cancelCrawl } from '../store/reducers/crawlSlice';
+
+const formatDate = (value) => {
+  if (!value) return '—';
+  const d = new Date(value);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${day}-${month}-${year} ${hours}:${minutes}`;
+};
 
 function Dashboard() {
   const dispatch = useDispatch();
   const { items: vendors = [] } = useSelector((state) => state.vendors || {});
   const { activeJob = null, history = [] } = useSelector((state) => state.crawls || {});
+  const [expandedJob, setExpandedJob] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const [stats, setStats] = useState({
     totalVendors: 0,
     crawledVendors: 0,
@@ -41,6 +54,14 @@ function Dashboard() {
       });
     }
   }, [vendors, history]);
+
+  const handleCancel = async (jobId) => {
+    if (!window.confirm('Are you sure you want to cancel this crawl job?')) return;
+    setCancelling(true);
+    await dispatch(cancelCrawl(jobId));
+    setCancelling(false);
+    setExpandedJob(false);
+  };
 
   const vendorPct = stats.totalVendors
     ? Math.round((stats.crawledVendors / stats.totalVendors) * 100)
@@ -104,15 +125,30 @@ function Dashboard() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Target URL</th>
+                    <th>Vendor</th>
                     <th>Status</th>
                     <th>Progress</th>
                     <th>Started At</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td className="font-medium">{activeJob.targetUrl || 'Unknown URL'}</td>
+                  <tr
+                    style={{ cursor: 'pointer' }}
+                    onClick={() => setExpandedJob(v => !v)}
+                  >
+                    <td className="font-medium">
+                      <div className="flex items-center gap-xs">
+                        <span style={{
+                          display: 'inline-block',
+                          transition: 'transform 0.2s',
+                          transform: expandedJob ? 'rotate(180deg)' : 'rotate(0deg)',
+                          fontSize: '0.7rem',
+                          color: 'var(--color-text-muted)',
+                        }}>▼</span>
+                        {vendors.find(v => v.id === activeJob.vendorId)?.name || activeJob.targetUrl || 'Unknown vendor'}
+                      </div>
+                    </td>
                     <td>
                       <span className="badge badge-success">{activeJob.status}</span>
                     </td>
@@ -124,13 +160,64 @@ function Dashboard() {
                             style={{ width: `${activeJob.progress || 0}%` }}
                           />
                         </div>
-                        <span className="text-xs text-muted">{activeJob.progress || 0}% Complete</span>
+                        <span className="text-xs text-muted">{activeJob.progress || 0}% complete</span>
                       </div>
                     </td>
-                    <td className="text-muted">
-                      {new Date(activeJob.startTime || Date.now()).toLocaleString()}
+                    <td className="text-muted">{formatDate(activeJob.startTime)}</td>
+                    <td onClick={e => e.stopPropagation()}>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        disabled={cancelling}
+                        onClick={() => handleCancel(activeJob.id)}
+                      >
+                        {cancelling ? 'Cancelling...' : 'Cancel'}
+                      </button>
                     </td>
                   </tr>
+                  {expandedJob && (
+                    <tr>
+                      <td colSpan={5} style={{ background: 'var(--color-surface)', padding: '1rem 1.25rem' }}>
+                        <div className="flex flex-col gap-sm">
+                          <div>
+                            <span className="text-xs text-muted">Job ID</span>
+                            <p className="text-sm font-medium" style={{ fontFamily: 'monospace' }}>{activeJob.id}</p>
+                          </div>
+                          <div>
+                            <span className="text-xs text-muted">URLs in this job</span>
+                            {(activeJob.urls || []).length > 0 ? (
+                              <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1.25rem' }}>
+                                {activeJob.urls.map((url, i) => (
+                                  <li key={i} className="text-sm">{url}</li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-muted">No URL info available</p>
+                            )}
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+                            <div>
+                              <span className="text-xs text-muted">Max retries</span>
+                              <p className="text-sm">{activeJob.settings?.maxRetries ?? '—'}</p>
+                            </div>
+                            <div>
+                              <span className="text-xs text-muted">Nav. timeout</span>
+                              <p className="text-sm">{activeJob.settings?.navigationTimeout ? `${activeJob.settings.navigationTimeout / 1000}s` : '—'}</p>
+                            </div>
+                            <div>
+                              <span className="text-xs text-muted">Human behavior</span>
+                              <p className="text-sm">{activeJob.settings?.simulateHumanBehavior ? 'Enabled' : 'Disabled'}</p>
+                            </div>
+                          </div>
+                          {activeJob.error && (
+                            <div style={{ background: 'var(--color-danger-light, #fee2e2)', borderRadius: '6px', padding: '0.5rem 0.75rem' }}>
+                              <span className="text-xs text-muted">Last error</span>
+                              <p className="text-sm" style={{ color: 'var(--color-danger)' }}>{activeJob.error}</p>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

@@ -119,6 +119,7 @@ class CrawlService {
 
       if (job.status !== 'cancelled') {
         job.results = results;
+        job.progress = 100;
         job.completionTime = new Date();
         job.status = 'completed';
         await db.updateCrawlJob(jobId, {
@@ -290,7 +291,7 @@ class CrawlService {
    */
   getActiveJobsForUser(userId) {
     return Array.from(this.activeJobs.values())
-      .filter(job => job.userId === userId);
+      .filter(job => job.userId === userId && ['pending', 'running'].includes(job.status));
   }
 
   /**

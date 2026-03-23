@@ -1,21 +1,12 @@
 // server/services/puppeteer/puppeteerManager.js
 const puppeteer = require('puppeteer-extra');
+const puppeteerConfig = require('./puppeteerConfig');
 
 class PuppeteerManager {
   constructor() {
     this.browsers = new Map();
     this.maxBrowsers = 5;
-    this.browserOptions = {
-      headless: 'new',
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--disable-gpu',
-        '--window-size=1920,1080'
-      ]
-    };
+    this.browserOptions = puppeteerConfig.launchOptions;
     this.latestMetrics = null;
   }
 

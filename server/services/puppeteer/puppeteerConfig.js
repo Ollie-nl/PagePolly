@@ -96,14 +96,6 @@ const puppeteerConfig = {
     factor: 2, // Exponential backoff factor
   },
   
-  // Screenshot settings
-  screenshots: {
-    enabled: true,
-    fullPage: true,
-    encoding: 'base64',
-    quality: 80,
-  },
-  
   // Cookie settings
   cookies: {
     preserve: true, // Preserve cookies between sessions

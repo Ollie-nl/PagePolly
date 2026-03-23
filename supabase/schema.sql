@@ -14,12 +14,13 @@ CREATE TABLE IF NOT EXISTS vendors (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   name        TEXT NOT NULL,
-  url         TEXT NOT NULL,
+  url         TEXT,
+  description TEXT,
   status      TEXT NOT NULL DEFAULT 'active'
                 CHECK (status IN ('active', 'inactive')),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  UNIQUE (user_id, url)
+  UNIQUE (user_id, name)
 );
 
 -- ============================================================

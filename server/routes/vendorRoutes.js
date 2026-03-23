@@ -39,11 +39,11 @@ router.get('/', async (req, res) => {
 // POST /api/vendors
 router.post('/', async (req, res) => {
   try {
-    const { name, url, status } = req.body;
-    if (!name || !url) {
-      return res.status(400).json({ error: 'name and url are required' });
+    const { name, url, description, status } = req.body;
+    if (!name) {
+      return res.status(400).json({ error: 'name is required' });
     }
-    const vendor = await db.createVendor(req.user.id, { name, url, status: status || 'active' });
+    const vendor = await db.createVendor(req.user.id, { name, url, description, status: status || 'active' });
     res.status(201).json(vendor);
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -53,8 +53,8 @@ router.post('/', async (req, res) => {
 // PUT /api/vendors/:id
 router.put('/:id', async (req, res) => {
   try {
-    const { name, url, status } = req.body;
-    const vendor = await db.updateVendor(req.params.id, req.user.id, { name, url, status });
+    const { name, url, description, status } = req.body;
+    const vendor = await db.updateVendor(req.params.id, req.user.id, { name, url, description, status });
     if (!vendor) return res.status(404).json({ error: 'Vendor not found' });
     res.json(vendor);
   } catch (error) {

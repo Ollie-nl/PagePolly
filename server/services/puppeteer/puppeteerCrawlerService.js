@@ -4,6 +4,9 @@ const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const AdblockerPlugin = require('puppeteer-extra-plugin-adblocker');
 const db = require('../../config/db');
 const { v4: uuidv4 } = require('uuid');
+const puppeteerConfig = require('./puppeteerConfig');
+const antiDetectionService = require('./antiDetectionService');
+const humanBehaviorSimulator = require('./humanBehaviorSimulator');
 
 // Add plugins
 puppeteer.use(StealthPlugin());
@@ -33,13 +36,28 @@ class PuppeteerCrawlerService {
       progress: 0,
       settings: {
         ...settings,
-        navigationTimeout: settings.navigationTimeout || 30000,
-        maxRetries: settings.maxRetries || 3,
+        navigationTimeout: settings.navigationTimeout || puppeteerConfig.timeouts.navigation,
+        maxRetries: settings.maxRetries || puppeteerConfig.retry.maxRetries,
         waitForSelector: settings.waitForSelector || 'body',
         simulateHumanBehavior: settings.simulateHumanBehavior !== false,
-        screenshots: settings.screenshots || { enabled: true, fullPage: true }
+        antiDetection: settings.antiDetection || puppeteerConfig.antiDetection,
       }
     };
+
+    // Log active crawler configuration
+    const ad = job.settings.antiDetection;
+    console.log(`[Crawler] Job ${jobId} started — ${urls.length} URL(s)`);
+    console.log(`[Crawler] Config:
+  stealth plugin    : enabled
+  adblocker         : enabled
+  user agent        : ${ad.userAgent === false ? `rotating (${ad.userAgents.length} UAs)` : ad.userAgent}
+  webgl protection  : ${ad.webglFingerprinting ? 'enabled' : 'disabled'}
+  canvas protection : ${ad.canvasFingerprinting ? 'enabled' : 'disabled'}
+  hw concurrency    : ${ad.hardwareConcurrency}
+  device memory     : ${ad.deviceMemory} GB
+  human behavior    : ${job.settings.simulateHumanBehavior ? `enabled (delay ${ad.humanBehavior.minDelay}–${ad.humanBehavior.maxDelay}ms)` : 'disabled'}
+  max retries       : ${job.settings.maxRetries}
+  nav timeout       : ${job.settings.navigationTimeout}ms`);
 
     // Store job in database
     await db.createCrawlJob(job);
@@ -75,8 +93,10 @@ class PuppeteerCrawlerService {
 
       // Process each URL
       for (const url of urls) {
+        console.log(`[Crawler] [${jobId}] Crawling (${completedUrls + 1}/${totalUrls}): ${url}`);
         try {
           const result = await this.crawlUrl(browser, url, settings);
+          console.log(`[Crawler] [${jobId}] Done: ${url} (${result.crawlDuration}ms, retries: ${result.retryCount})`);
           await db.storeCrawlResult({
             jobId,
             vendorId: job.vendorId,
@@ -84,13 +104,14 @@ class PuppeteerCrawlerService {
           });
         } catch (error) {
           hasErrors = true;
+          console.error(`[Crawler] [${jobId}] Failed: ${url} — ${error.message}`);
           await db.recordCrawlError(jobId, url, error.message);
-          console.error(`Error crawling ${url}:`, error);
         }
 
         // Update progress
         completedUrls++;
         const progress = Math.round((completedUrls / totalUrls) * 100);
+        console.log(`[Crawler] [${jobId}] Progress: ${progress}% (${completedUrls}/${totalUrls})`);
         await db.updateCrawlJob(jobId, { progress });
       }
 
@@ -147,20 +168,11 @@ class PuppeteerCrawlerService {
 
         // Simulate human behavior if enabled
         if (settings.simulateHumanBehavior) {
-          await this.simulateHumanBehavior(page);
+          await this.simulateHumanBehavior(page, settings);
         }
 
         // Extract data
         const data = await this.extractPageData(page);
-
-        // Take screenshot if enabled
-        let screenshot = null;
-        if (settings.screenshots?.enabled) {
-          screenshot = await page.screenshot({
-            fullPage: settings.screenshots.fullPage,
-            encoding: 'base64'
-          });
-        }
 
         await page.close();
 
@@ -168,7 +180,6 @@ class PuppeteerCrawlerService {
           url,
           status: 'success',
           data,
-          screenshot,
           crawlDuration: Date.now() - startTime,
           retryCount
         };
@@ -195,22 +206,17 @@ class PuppeteerCrawlerService {
    * @param {Object} settings - Crawl settings
    */
   async configurePage(page, settings) {
-    // Set viewport
-    await page.setViewport({ width: 1920, height: 1080 });
-
-    // Set user agent
-    await page.setUserAgent(
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-    );
+    // Apply anti-detection measures (user agent rotation, fingerprinting protection, headers, viewport)
+    await antiDetectionService.applyAntiDetection(page, settings.antiDetection);
 
     // Enable JavaScript
     await page.setJavaScriptEnabled(true);
 
-    // Block unnecessary resources
+    // Block unnecessary resources for faster crawling
+    const blockedResources = puppeteerConfig.resourceManagement.blockedResources;
     await page.setRequestInterception(true);
     page.on('request', (request) => {
-      const resourceType = request.resourceType();
-      if (['image', 'stylesheet', 'font'].includes(resourceType)) {
+      if (blockedResources.includes(request.resourceType())) {
         request.abort();
       } else {
         request.continue();
@@ -221,26 +227,10 @@ class PuppeteerCrawlerService {
   /**
    * Simulate human-like behavior
    * @param {Page} page - Puppeteer page instance
+   * @param {Object} settings - Crawl settings
    */
-  async simulateHumanBehavior(page) {
-    // Random scrolling
-    await page.evaluate(() => {
-      const scrollAmount = Math.floor(Math.random() * 500) + 200;
-      window.scrollBy(0, scrollAmount);
-    });
-
-    // Random mouse movements
-    const viewport = await page.viewport();
-    await page.mouse.move(
-      Math.random() * viewport.width,
-      Math.random() * viewport.height,
-      { steps: 10 }
-    );
-
-    // Random pauses
-    await new Promise(resolve => 
-      setTimeout(resolve, Math.random() * 1000 + 500)
-    );
+  async simulateHumanBehavior(page, settings) {
+    await humanBehaviorSimulator.simulateHumanBehavior(page, settings.antiDetection?.humanBehavior || {});
   }
 
   /**

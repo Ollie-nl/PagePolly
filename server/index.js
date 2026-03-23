@@ -18,7 +18,7 @@ const supabase = createClient(
 
 // ── Middleware ───────────────────────────────────────────────
 app.use(cors());
-app.use(express.json({ limit: '20mb' }));   // large limit for screenshot payloads
+app.use(express.json({ limit: '2mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 if (process.env.NODE_ENV === 'production') {

@@ -147,9 +147,7 @@ const crawlSlice = createSlice({
       .addCase(getActiveCrawls.fulfilled, (state, action) => {
         state.loading = false;
         const activeCrawls = action.payload.data || [];
-        if (activeCrawls.length > 0) {
-          state.activeJob = activeCrawls[0]; // Get the most recent active job
-        }
+        state.activeJob = activeCrawls.length > 0 ? activeCrawls[0] : null;
       })
       .addCase(getActiveCrawls.rejected, (state, action) => {
         state.loading = false;

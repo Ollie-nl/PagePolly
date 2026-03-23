@@ -99,7 +99,7 @@ const db = {
   // ── Crawl Results ───────────────────────────────────────────
 
   async storeCrawlResult(result) {
-    const { jobId, vendorId, url, status, data, screenshot, crawlDuration, retryCount } = result;
+    const { jobId, vendorId, url, status, data, crawlDuration, retryCount } = result;
     const { data: stored, error } = await supabase
       .from('crawl_results')
       .insert({
@@ -108,7 +108,6 @@ const db = {
         url,
         status,
         data: data || {},
-        screenshot: screenshot || null,
         crawl_duration: crawlDuration || 0,
         retry_count: retryCount || 0,
       })

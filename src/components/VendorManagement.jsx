@@ -1,12 +1,25 @@
 // src/components/VendorManagement.jsx
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
-import { fetchVendors, addVendor, deleteVendor } from '../store/reducers/vendorSlice';
+import { fetchVendors, addVendor, updateVendor, deleteVendor } from '../store/reducers/vendorSlice';
 import CrawlButton from './CrawlButton';
+
+const formatDate = (value) => {
+  if (!value) return null;
+  const d = new Date(value);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  return `${day}-${month}-${year} ${hours}:${minutes}`;
+};
 
 const VendorManagement = () => {
   const [vendors, setVendors] = useState([]);
   const [newVendor, setNewVendor] = useState({ name: '', url: '', description: '' });
+  const [editingVendor, setEditingVendor] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', url: '', description: '' });
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -60,6 +73,33 @@ const VendorManagement = () => {
     } catch (err) {
       setError('Failed to delete vendor');
       console.error('Error deleting vendor:', err);
+    }
+  };
+
+  const handleEditOpen = (vendor) => {
+    setEditingVendor(vendor.id);
+    setEditForm({ name: vendor.name, url: vendor.url || '', description: vendor.description || '' });
+    setError(null);
+    setSuccess(null);
+  };
+
+  const handleEditCancel = () => {
+    setEditingVendor(null);
+    setEditForm({ name: '', url: '', description: '' });
+  };
+
+  const handleEditSave = async (id) => {
+    if (!editForm.name.trim()) {
+      setError('Vendor name is required');
+      return;
+    }
+    try {
+      await dispatch(updateVendor({ id, data: editForm })).unwrap();
+      setSuccess('Vendor updated successfully');
+      setEditingVendor(null);
+    } catch (err) {
+      setError('Failed to update vendor');
+      console.error('Error updating vendor:', err);
     }
   };
 
@@ -143,47 +183,86 @@ const VendorManagement = () => {
             <div>
               {vendors.map((vendor) => (
                 <div key={vendor.id} className="vendor-item">
-                  <div style={{ flex: 1 }}>
-                    <h3 className="h5">{vendor.name}</h3>
-                    {vendor.url && (
-                      <a
-                        href={vendor.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm"
-                      >
-                        {vendor.url}
-                      </a>
-                    )}
-                    {vendor.description && (
-                      <p className="text-muted text-sm mt-xs">{vendor.description}</p>
-                    )}
-                    <p className="text-xs text-muted mt-xs">
-                      {vendor.lastCrawled
-                        ? <>Last crawled: <strong>{new Date(vendor.lastCrawled).toLocaleString()}</strong></>
-                        : <span style={{ color: 'var(--color-warning)' }}>Not crawled yet</span>
-                      }
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-sm">
-                    <CrawlButton
-                      vendorId={vendor.id}
-                      onCrawlComplete={(job) => {
-                        if (job.status === 'completed') {
-                          setSuccess(`Crawl completed for ${vendor.name}`);
-                        } else if (job.status === 'failed') {
-                          setError(`Crawl failed for ${vendor.name}`);
+                  {editingVendor === vendor.id ? (
+                    <div style={{ flex: 1 }}>
+                      <div className="form-group">
+                        <label className="form-label required">Name</label>
+                        <input
+                          type="text"
+                          className="input"
+                          value={editForm.name}
+                          onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">URL</label>
+                        <input
+                          type="url"
+                          className="input"
+                          value={editForm.url}
+                          onChange={e => setEditForm(f => ({ ...f, url: e.target.value }))}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">Description</label>
+                        <textarea
+                          className="textarea"
+                          rows={2}
+                          value={editForm.description}
+                          onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                        />
+                      </div>
+                      <div className="flex gap-sm mt-sm">
+                        <button className="btn btn-primary btn-sm" onClick={() => handleEditSave(vendor.id)}>Save</button>
+                        <button className="btn btn-secondary btn-sm" onClick={handleEditCancel}>Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ flex: 1 }}>
+                      <h3 className="h5">{vendor.name}</h3>
+                      {vendor.url && (
+                        <a href={vendor.url} target="_blank" rel="noopener noreferrer" className="text-sm">
+                          {vendor.url}
+                        </a>
+                      )}
+                      {vendor.description && (
+                        <p className="text-muted text-sm mt-xs">{vendor.description}</p>
+                      )}
+                      <p className="text-xs text-muted mt-xs">
+                        {vendor.lastCrawled
+                          ? <>Last crawled: <strong>{formatDate(vendor.lastCrawled)}</strong></>
+                          : <span style={{ color: 'var(--color-warning)' }}>Not crawled yet</span>
                         }
-                      }}
-                    />
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => handleDelete(vendor.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
+                      </p>
+                    </div>
+                  )}
+
+                  {editingVendor !== vendor.id && (
+                    <div className="flex items-center gap-sm">
+                      <CrawlButton
+                        vendorId={vendor.id}
+                        onCrawlComplete={(job) => {
+                          if (job.status === 'completed') {
+                            setSuccess(`Crawl completed for ${vendor.name}`);
+                          } else if (job.status === 'failed') {
+                            setError(`Crawl failed for ${vendor.name}`);
+                          }
+                        }}
+                      />
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        onClick={() => handleEditOpen(vendor)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="btn btn-danger btn-sm"
+                        onClick={() => handleDelete(vendor.id)}
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
