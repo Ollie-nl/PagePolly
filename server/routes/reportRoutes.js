@@ -21,10 +21,10 @@ router.get('/', async (req, res) => {
     let query = supabase
       .from('crawl_jobs')
       .select(`
-        id, created_at, completed_at, status, vendor_id, urls,
+        id, created_at, completed_at, status, vendor_id, urls, settings,
         vendors ( name, url ),
         crawl_results ( id, url, status, crawl_duration ),
-        crawl_errors ( id )
+        crawl_errors ( id, url, error )
       `)
       .eq('user_email', userEmail)
       .in('status', ['completed', 'partial', 'failed'])
@@ -41,8 +41,10 @@ router.get('/', async (req, res) => {
     const reports = (data || []).map(job => ({
       id:         job.id,
       vendor:     job.vendors?.name || 'Unknown',
+      vendorUrl:  job.vendors?.url || null,
       vendorId:   job.vendor_id,
       date:       job.created_at,
+      completedAt: job.completed_at,
       pages:      job.crawl_results?.length || 0,
       errors:     job.crawl_errors?.length || 0,
       status:     job.status === 'completed' && (job.crawl_errors?.length || 0) === 0
@@ -53,6 +55,10 @@ router.get('/', async (req, res) => {
       duration:   job.completed_at
                     ? new Date(job.completed_at) - new Date(job.created_at)
                     : null,
+      urls:       job.urls || [],
+      settings:   job.settings || {},
+      crawlResults: (job.crawl_results || []).map(r => ({ url: r.url, status: r.status, duration: r.crawl_duration })),
+      crawlErrors:  (job.crawl_errors || []).map(e => ({ url: e.url, error: e.error })),
     }));
 
     res.json(reports);

@@ -358,6 +358,7 @@ function Reports() {
   const { items: reports, status, error } = useSelector((state) => state.reports);
   const [selectedId, setSelectedId]       = useState(null);
   const [vendorFilter, setVendorFilter]   = useState('');
+  const [expandedRow, setExpandedRow]     = useState(null);
   const [compareBase, setCompareBase]     = useState(null); // report object
   const [compareTarget, setCompareTarget] = useState(null); // report object
 
@@ -475,36 +476,114 @@ function Reports() {
                 </thead>
                 <tbody>
                   {filtered.map(report => {
-                    const isBase = compareBase?.id === report.id;
+                    const isBase    = compareBase?.id === report.id;
+                    const isOpen    = expandedRow === report.id;
+                    const durationS = report.duration ? (report.duration / 1000).toFixed(1) : null;
+
                     return (
-                      <tr key={report.id} style={isBase ? { background: 'var(--color-warning-light, #fffbeb)' } : {}}>
-                        <td className="font-medium">{report.vendor}</td>
-                        <td className="text-muted">{formatDate(report.date)}</td>
-                        <td className="text-muted">{report.pages}</td>
-                        <td className="text-muted">
-                          {report.errors > 0 ? <span className="badge badge-error">{report.errors}</span> : '—'}
-                        </td>
-                        <td>
-                          <span className={`badge ${statusBadge(report.status)}`}>
-                            {statusLabel(report.status)}
-                          </span>
-                        </td>
-                        <td className="table-cell-actions">
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={() => setSelectedId(report.id)}
-                          >
-                            View
-                          </button>
-                          <button
-                            className={`btn btn-sm ${isBase ? 'btn-warning' : 'btn-secondary'}`}
-                            onClick={() => handleCompareClick(report)}
-                            title="Select two crawls from the same vendor to compare"
-                          >
-                            {isBase ? '✓ Base' : '⇄ Compare'}
-                          </button>
-                        </td>
-                      </tr>
+                      <React.Fragment key={report.id}>
+                        <tr
+                          style={{ cursor: 'pointer', ...(isBase ? { background: 'var(--color-warning-light, #fffbeb)' } : {}) }}
+                          onClick={() => setExpandedRow(isOpen ? null : report.id)}
+                        >
+                          <td className="font-medium">
+                            <div className="flex items-center gap-xs">
+                              <span style={{
+                                display: 'inline-block',
+                                transition: 'transform 0.2s',
+                                transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                                fontSize: '0.65rem',
+                                color: 'var(--color-text-muted)',
+                              }}>▼</span>
+                              {report.vendor}
+                            </div>
+                          </td>
+                          <td className="text-muted">{formatDate(report.date)}</td>
+                          <td className="text-muted">{report.pages}</td>
+                          <td className="text-muted">
+                            {report.errors > 0 ? <span className="badge badge-error">{report.errors}</span> : '—'}
+                          </td>
+                          <td>
+                            <span className={`badge ${statusBadge(report.status)}`}>
+                              {statusLabel(report.status)}
+                            </span>
+                          </td>
+                          <td className="table-cell-actions" onClick={e => e.stopPropagation()}>
+                            <button className="btn btn-ghost btn-sm" onClick={() => setSelectedId(report.id)}>
+                              View
+                            </button>
+                            <button
+                              className={`btn btn-sm ${isBase ? 'btn-warning' : 'btn-secondary'}`}
+                              onClick={() => handleCompareClick(report)}
+                              title="Select two crawls from the same vendor to compare"
+                            >
+                              {isBase ? '✓ Base' : '⇄ Compare'}
+                            </button>
+                          </td>
+                        </tr>
+
+                        {isOpen && (
+                          <tr>
+                            <td colSpan={6} style={{ background: 'var(--color-surface)', padding: 0, borderTop: 'none' }}>
+                              <div style={{ padding: '1rem 1.25rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.25rem' }}>
+
+                                {/* Timing */}
+                                <div>
+                                  <p className="text-xs text-muted mb-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>Timing</p>
+                                  <p className="text-sm"><strong>Gestart:</strong> {formatDate(report.date)}</p>
+                                  {report.completedAt && <p className="text-sm"><strong>Klaar:</strong> {formatDate(report.completedAt)}</p>}
+                                  {durationS && <p className="text-sm"><strong>Duur:</strong> {durationS}s</p>}
+                                </div>
+
+                                {/* Settings */}
+                                <div>
+                                  <p className="text-xs text-muted mb-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>Instellingen</p>
+                                  {report.settings?.maxPages && <p className="text-sm"><strong>Max pages:</strong> {report.settings.maxPages}</p>}
+                                  {report.settings?.maxRetries !== undefined && <p className="text-sm"><strong>Max retries:</strong> {report.settings.maxRetries}</p>}
+                                  <p className="text-sm"><strong>Human behavior:</strong> {report.settings?.simulateHumanBehavior ? 'Aan' : 'Uit'}</p>
+                                </div>
+
+                                {/* Crawled pages */}
+                                {report.crawlResults?.length > 0 && (
+                                  <div style={{ gridColumn: 'span 2' }}>
+                                    <p className="text-xs text-muted mb-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                      Gecrawlde pagina's ({report.crawlResults.length})
+                                    </p>
+                                    <div style={{ maxHeight: '140px', overflowY: 'auto' }}>
+                                      {report.crawlResults.map((r, i) => (
+                                        <div key={i} className="flex items-center gap-sm text-sm" style={{ padding: '2px 0' }}>
+                                          <span className={`badge ${r.status === 'success' ? 'badge-success' : 'badge-error'}`} style={{ fontSize: '0.65rem', padding: '1px 5px' }}>
+                                            {r.status === 'success' ? 'OK' : 'ERR'}
+                                          </span>
+                                          <a href={r.url} target="_blank" rel="noopener noreferrer" className="text-muted" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                            {r.url}
+                                          </a>
+                                          {r.duration && <span className="text-xs text-muted" style={{ flexShrink: 0 }}>{r.duration}ms</span>}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Errors */}
+                                {report.crawlErrors?.length > 0 && (
+                                  <div style={{ gridColumn: 'span 2' }}>
+                                    <p className="text-xs text-muted mb-xs" style={{ textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--color-danger, #dc2626)' }}>
+                                      Fouten ({report.crawlErrors.length})
+                                    </p>
+                                    {report.crawlErrors.map((e, i) => (
+                                      <div key={i} className="text-sm mb-xs">
+                                        <span className="text-muted" style={{ wordBreak: 'break-all' }}>{e.url}</span>
+                                        <p style={{ color: 'var(--color-danger, #dc2626)', fontSize: '0.75rem' }}>{e.error}</p>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
