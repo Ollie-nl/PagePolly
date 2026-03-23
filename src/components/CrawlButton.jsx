@@ -114,9 +114,7 @@ const CrawlButton = ({ vendorId, onCrawlComplete }) => {
           <div className="modal">
             <div className="modal-header">
               <h3>{phase === 'config' ? 'Configure Crawl' : 'Crawl Progress'}</h3>
-              {phase !== 'running' && (
-                <button className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
-              )}
+              <button className="modal-close-btn" onClick={handleClose} aria-label="Close">&times;</button>
             </div>
 
             <div className="modal-body">
@@ -186,6 +184,11 @@ const CrawlButton = ({ vendorId, onCrawlComplete }) => {
                     Start Crawl
                   </button>
                 </>
+              )}
+              {phase === 'running' && (
+                <button className="btn btn-secondary" onClick={handleClose}>
+                  Run in background
+                </button>
               )}
               {phase === 'done' && (
                 <button className="btn btn-primary" onClick={handleClose}>
